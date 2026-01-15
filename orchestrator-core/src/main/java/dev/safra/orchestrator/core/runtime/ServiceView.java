@@ -1,0 +1,22 @@
+package dev.safra.orchestrator.core.runtime;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import dev.safra.orchestrator.model.ServiceStatus;
+
+public record ServiceView(
+    String name,
+    String path,
+    List<String> command,
+    String logFile,
+    Map<String, String> env,
+    String javaHome,
+    List<String> containerIds,
+    Long pid,
+    ServiceStatus status,
+    Instant lastStartAt,
+    Instant lastStopAt,
+    String lastError) {
+}

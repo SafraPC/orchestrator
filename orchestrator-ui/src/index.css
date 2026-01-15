@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pequenos defaults para UX */
+* {
+  box-sizing: border-box;
+}
+

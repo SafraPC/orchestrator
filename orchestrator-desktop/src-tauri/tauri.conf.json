@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Orchestrator",
+  "version": "0.1.0",
+  "identifier": "dev.safra.spring-dev-orchestrator",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../orchestrator-ui/dist"
+  },
+  "app": {
+    "security": {
+      "capabilities": ["main-capabilities"]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Orchestrator",
+        "width": 1200,
+        "height": 800
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    }
+  }
+}

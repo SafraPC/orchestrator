@@ -1,3 +1,16 @@
+.DS_Store
+.idea/
+.vscode/
+
+**/target/
+**/node_modules/
+**/dist/
+**/.turbo/
+**/.cache/
+
+orchestrator-core/services.yaml
+orchestrator-core/.orchestrator/
+
 # Logs
 logs
 *.log

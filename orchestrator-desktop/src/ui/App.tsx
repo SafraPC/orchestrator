@@ -71,7 +71,7 @@ export function App() {
             </Tooltip>
           </div>
           <div className={`transition-opacity duration-200 ${containersCollapsed ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100 h-[calc(100%-37px)]"}`}>
-            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={async (id) => { setSelectedContainer(id); await refresh(); }} onRefresh={refresh} onContainersChanged={refresh} />
+            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={async (id) => { setSelectedContainer(id); await refresh(); }} onRefresh={refresh} onContainersChanged={refresh} onToast={addToast} />
           </div>
         </aside>
         {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={140} max={320} />}

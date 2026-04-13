@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,6 +63,8 @@ public class WorkspaceManager {
     this.workspace = store.readJson(workspaceFile, Workspace.class).orElseGet(Workspace::new);
     if (this.workspace.getContainers() == null)
       workspace.setContainers(new HashMap<>());
+    if (this.workspace.getRemovedServices() == null)
+      workspace.setRemovedServices(new HashSet<>());
 
     Map<String, ServiceRuntime> runtime = store.readJson(runtimeFile, new TypeReference<Map<String, ServiceRuntime>>() {
     }).orElseGet(HashMap::new);
@@ -108,8 +111,11 @@ public class WorkspaceManager {
     if (root == null || root.isBlank())
       throw new IllegalArgumentException("params.root é obrigatório");
     Path rootPath = Path.of(root).toAbsolutePath().normalize();
-    if (!workspace.getRoots().contains(rootPath.toString()))
+    boolean isNew = !workspace.getRoots().contains(rootPath.toString());
+    if (isNew) {
       workspace.getRoots().add(rootPath.toString());
+      workspace.getRemovedServices().clear();
+    }
     persistWorkspace();
     return scanRoots();
   }
@@ -141,8 +147,10 @@ public class WorkspaceManager {
       found.addAll(scanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
 
     Map<String, ServiceDefinition> byName = new HashMap<>();
-    for (ServiceDefinition d : found)
-      byName.put(d.getName(), d);
+    for (ServiceDefinition d : found) {
+      if (!workspace.getRemovedServices().contains(d.getName()))
+        byName.put(d.getName(), d);
+    }
 
     for (Map.Entry<String, List<String>> entry : savedContainerIds.entrySet()) {
       ServiceDefinition def = byName.get(entry.getKey());

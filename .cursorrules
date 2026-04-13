@@ -67,7 +67,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - openServiceFolder, openServiceTerminal, openServiceInEditor
 
 ### Persistence
-- `workspace.json` — roots, services, containers
+- `workspace.json` — roots, services, containers, removedServices (exclusion set)
 - `runtime.json` — per-service runtime state (pid, status, timestamps)
 - Both in `--stateDir` directory
 
@@ -75,6 +75,8 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - Container deletion NEVER removes services — only clears containerIds
 - scanRoots() preserves existing containerIds by merging on service name
 - Stale containerIds (referencing deleted containers) are cleaned during scan
+- Removed services tracked in `workspace.removedServices`; excluded from scan
+- importRootAndScan clears removedServices when adding a new root
 - Ports auto-detected from application.properties/yml, fallback to hash-based
 
 ## Desktop Module (Tauri + React)

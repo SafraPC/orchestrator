@@ -40,7 +40,8 @@ public class CoreRuntime {
     this.logManager = new LogManager(om, emitEvent, shutdown);
     this.workspaceManager = new WorkspaceManager(stateDir, om, store, portExtractor, emitEvent, services);
     this.serviceManager = new ServiceManager(om, processManager, logManager, emitEvent, services,
-        () -> workspaceManager.persistRuntime());
+        () -> workspaceManager.persistRuntime(), () -> workspaceManager.persistWorkspace(),
+        workspaceManager.getWorkspace());
     this.launcher = new ExternalToolLauncher();
 
     LogFileWriter.initialize(stateDir);

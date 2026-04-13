@@ -26,16 +26,20 @@ public class ServiceManager {
   private final BiConsumer<String, JsonNode> emitEvent;
   private final Map<String, ServiceDescriptor> services;
   private final Runnable persistRuntime;
+  private final Runnable persistWorkspace;
+  private final Workspace workspace;
 
   public ServiceManager(ObjectMapper om, ProcessManager processManager, LogManager logManager,
       BiConsumer<String, JsonNode> emitEvent, Map<String, ServiceDescriptor> services,
-      Runnable persistRuntime) {
+      Runnable persistRuntime, Runnable persistWorkspace, Workspace workspace) {
     this.om = om;
     this.processManager = processManager;
     this.logManager = logManager;
     this.emitEvent = emitEvent;
     this.services = services;
     this.persistRuntime = persistRuntime;
+    this.persistWorkspace = persistWorkspace;
+    this.workspace = workspace;
   }
 
   public JsonNode list() {
@@ -149,6 +153,9 @@ public class ServiceManager {
         processManager.stop(pid);
       logManager.removeSubscriptionsFor(name);
     }
+    workspace.getServices().removeIf(d -> d.getName().equals(name));
+    workspace.getRemovedServices().add(name);
+    persistWorkspace.run();
     persistRuntime.run();
     emitServicesChanged();
     return list();

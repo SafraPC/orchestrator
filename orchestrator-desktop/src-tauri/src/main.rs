@@ -12,9 +12,10 @@ use std::time::Duration;
 use tauri::{Emitter, Manager, State};
 use uuid::Uuid;
 
+#[derive(Clone)]
 struct CoreBridge {
-  child: Mutex<Option<Child>>,
-  stdin: Mutex<Option<ChildStdin>>,
+  child: Arc<Mutex<Option<Child>>>,
+  stdin: Arc<Mutex<Option<ChildStdin>>>,
   pending: Arc<Mutex<HashMap<String, std::sync::mpsc::Sender<Value>>>>,
 }
 
@@ -46,6 +47,25 @@ fn core_jar_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
   }
 }
 
+fn shell_path() -> String {
+  let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/unknown".to_string());
+  let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+  let output = Command::new(&shell)
+    .args(["-l", "-c", "echo $PATH"])
+    .output();
+  if let Ok(out) = output {
+    let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if !p.is_empty() {
+      return p;
+    }
+  }
+  let sdkman = format!("{home}/.sdkman/candidates/java/current/bin");
+  let brew_arm = "/opt/homebrew/bin";
+  let brew_x86 = "/usr/local/bin";
+  let fallback = std::env::var("PATH").unwrap_or_default();
+  format!("{sdkman}:{brew_arm}:{brew_x86}:{fallback}")
+}
+
 fn spawn_core(app: &tauri::AppHandle) -> std::io::Result<(Child, ChildStdin, std::process::ChildStdout)> {
   let state = state_dir(app);
   fs::create_dir_all(&state)?;
@@ -58,6 +78,8 @@ fn spawn_core(app: &tauri::AppHandle) -> std::io::Result<(Child, ChildStdin, std
   let stdin = Stdio::piped();
   let stderr_file = fs::File::create(log_dir.join("core.stderr.log"))?;
 
+  let full_path = shell_path();
+
   let mut child = Command::new("java")
     .args([
       "-jar",
@@ -65,6 +87,7 @@ fn spawn_core(app: &tauri::AppHandle) -> std::io::Result<(Child, ChildStdin, std
       "--stateDir",
       state.join("core").to_string_lossy().as_ref(),
     ])
+    .env("PATH", &full_path)
     .stdin(stdin)
     .stdout(stdout)
     .stderr(Stdio::from(stderr_file))
@@ -145,8 +168,10 @@ impl CoreBridge {
     Ok(())
   }
 
-  fn send_request(&self, app: &tauri::AppHandle, method: &str, params: Value) -> Result<Value, String> {
-    self.ensure_started(app)?;
+  fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
+    if !self.is_alive() {
+      return Err("Core não está rodando".to_string());
+    }
 
     let id = Uuid::new_v4().to_string();
     let req = serde_json::json!({
@@ -169,7 +194,7 @@ impl CoreBridge {
       stdin.flush().ok();
     }
 
-    match rx.recv_timeout(Duration::from_secs(30)) {
+    match rx.recv_timeout(Duration::from_secs(120)) {
       Ok(resp) => Ok(resp),
       Err(_) => {
         self.pending.lock().ok().map(|mut m| m.remove(&id));
@@ -177,29 +202,31 @@ impl CoreBridge {
       }
     }
   }
+
+  fn shutdown(&self) {
+    self.cleanup();
+  }
 }
 
 #[tauri::command]
-fn core_request(app: tauri::AppHandle, bridge: State<'_, CoreBridge>, method: String, params: Value) -> Result<Value, String> {
-  let resp = match bridge.send_request(&app, &method, params) {
-    Ok(r) => r,
-    Err(e) => {
-      return Err(e);
-    }
-  };
-  
-  if resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+async fn core_request(bridge: State<'_, CoreBridge>, method: String, params: Value) -> Result<Value, String> {
+  let bridge = bridge.inner().clone();
+  let resp: Value = tauri::async_runtime::spawn_blocking(move || bridge.send_request(&method, params))
+    .await
+    .map_err(|e| format!("Task falhou: {e}"))??;
+
+  if resp.get("ok").and_then(|v: &Value| v.as_bool()).unwrap_or(false) {
     Ok(resp.get("result").cloned().unwrap_or(Value::Null))
   } else {
     let error_msg = resp
       .get("error")
-      .and_then(|e| e.get("message"))
-      .and_then(|m| m.as_str())
+      .and_then(|e: &Value| e.get("message"))
+      .and_then(|m: &Value| m.as_str())
       .unwrap_or("Erro desconhecido");
     let error_code = resp
       .get("error")
-      .and_then(|e| e.get("code"))
-      .and_then(|c| c.as_str())
+      .and_then(|e: &Value| e.get("code"))
+      .and_then(|c: &Value| c.as_str())
       .unwrap_or("UNKNOWN");
     Err(format!("[{}] {}", error_code, error_msg))
   }
@@ -221,16 +248,10 @@ async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> 
   }
 }
 
-impl CoreBridge {
-  fn shutdown(&self) {
-    self.cleanup();
-  }
-}
-
 fn main() {
   let bridge = CoreBridge {
-    child: Mutex::new(None),
-    stdin: Mutex::new(None),
+    child: Arc::new(Mutex::new(None)),
+    stdin: Arc::new(Mutex::new(None)),
     pending: Arc::new(Mutex::new(HashMap::new())),
   };
 
@@ -253,4 +274,3 @@ fn main() {
       }
     });
 }
-

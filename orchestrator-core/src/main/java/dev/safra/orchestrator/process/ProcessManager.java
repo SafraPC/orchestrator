@@ -61,19 +61,26 @@ public class ProcessManager {
         javaHome = detectJavaHome(def.getJavaVersion());
       }
 
+      String path = env.getOrDefault("PATH", "");
       if (javaHome != null && !javaHome.isBlank()) {
         env.put("JAVA_HOME", javaHome);
-        String path = env.getOrDefault("PATH", "");
-        String javaBin = Path.of(javaHome, "bin").toString();
-        env.put("PATH", javaBin + ":" + path);
+        path = Path.of(javaHome, "bin") + ":" + path;
       }
+      String home = System.getProperty("user.home");
+      String sdkmanMvn = home + "/.sdkman/candidates/maven/current/bin";
+      if (Files.isDirectory(Path.of(sdkmanMvn))) path = sdkmanMvn + ":" + path;
+      for (String extra : new String[]{"/opt/homebrew/bin", "/usr/local/bin"}) {
+        if (!path.contains(extra) && Files.isDirectory(Path.of(extra))) path = extra + ":" + path;
+      }
+      env.put("PATH", path);
 
       try {
-        if (!Files.exists(logPath)) {
-          Files.createFile(logPath);
-          Files.writeString(logPath, "[orchestrator] Processo iniciando...\n", java.nio.charset.StandardCharsets.UTF_8,
-              java.nio.file.StandardOpenOption.APPEND);
-        }
+        if (!Files.exists(logPath)) Files.createFile(logPath);
+        String jh = env.getOrDefault("JAVA_HOME", "system");
+        Files.writeString(logPath,
+            "[orchestrator] Iniciando com JAVA_HOME=" + jh + "\n",
+            java.nio.charset.StandardCharsets.UTF_8,
+            java.nio.file.StandardOpenOption.APPEND);
       } catch (Exception e) {
       }
 

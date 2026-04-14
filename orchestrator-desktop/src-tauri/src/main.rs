@@ -236,15 +236,18 @@ async fn core_request(bridge: State<'_, CoreBridge>, method: String, params: Val
 async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
   use tauri_plugin_dialog::DialogExt;
   
-  let path = app
+  let paths = app
     .dialog()
     .file()
-    .set_title("Selecionar pasta raiz")
-    .blocking_pick_folder();
+    .set_title("Selecionar pastas")
+    .blocking_pick_folders();
   
-  match path {
-    Some(p) => Ok(Some(p.to_string())),
-    None => Ok(None),
+  match paths {
+    Some(list) if !list.is_empty() => {
+      let joined = list.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("|");
+      Ok(Some(joined))
+    }
+    _ => Ok(None),
   }
 }
 

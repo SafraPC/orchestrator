@@ -151,6 +151,8 @@ public class ServiceManager {
       Long pid = sd.getRuntime().getPid();
       if (pid != null)
         processManager.stop(pid);
+      if (sd.getDefinition().getContainerIds() != null)
+        sd.getDefinition().getContainerIds().clear();
       logManager.removeSubscriptionsFor(name);
     }
     workspace.getServices().removeIf(d -> d.getName().equals(name));

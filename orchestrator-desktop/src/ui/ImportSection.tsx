@@ -13,21 +13,21 @@ export function ImportSection(props: {
   async function handleImport() {
     setImporting(true);
     try {
-      let path: string | null = null;
+      let paths: string[] = [];
       if (!rootInput.trim()) {
         const picked = await api.selectFolder();
         if (picked?.trim()) {
-          path = picked.trim();
-          setRootInput(path);
+          paths = picked.trim().split("|").filter(Boolean);
+          setRootInput(paths.length === 1 ? paths[0] : `${paths.length} pastas`);
         } else {
           props.addToast("error", "Nenhuma pasta selecionada.");
           setImporting(false);
           return;
         }
       } else {
-        path = rootInput.trim();
+        paths = [rootInput.trim()];
       }
-      const result = await api.importRootAndScan(path);
+      const result = await api.importRootsAndScan(paths);
       const count = Array.isArray(result) ? result.length : 0;
       if (count > 0) {
         props.addToast("success", `${count} serviço(s) descoberto(s)`);

@@ -110,14 +110,63 @@ public class WorkspaceManager {
   public JsonNode importRootAndScan(String root) {
     if (root == null || root.isBlank())
       throw new IllegalArgumentException("params.root é obrigatório");
-    Path rootPath = Path.of(root).toAbsolutePath().normalize();
-    boolean isNew = !workspace.getRoots().contains(rootPath.toString());
-    if (isNew) {
-      workspace.getRoots().add(rootPath.toString());
-      workspace.getRemovedServices().clear();
+    return importRootsAndScan(List.of(root));
+  }
+
+  public JsonNode importRootsAndScan(List<String> roots) {
+    if (roots == null || roots.isEmpty())
+      throw new IllegalArgumentException("params.roots é obrigatório");
+
+    List<Path> newRoots = new ArrayList<>();
+    List<Path> directServices = new ArrayList<>();
+
+    for (String root : roots) {
+      Path p = Path.of(root).toAbsolutePath().normalize();
+      if (Files.exists(p.resolve("pom.xml")) && !scanner.isAggregator(p.resolve("pom.xml"))) {
+        directServices.add(p);
+      } else {
+        newRoots.add(p);
+      }
     }
+
+    boolean changed = false;
+
+    for (Path rootPath : newRoots) {
+      if (!workspace.getRoots().contains(rootPath.toString())) {
+        workspace.getRoots().add(rootPath.toString());
+        changed = true;
+      }
+    }
+
+    for (Path svcPath : directServices) {
+      List<ServiceDefinition> found = scanner.scanRoot(svcPath, workspace.getExcludeDirs());
+      for (ServiceDefinition def : found) {
+        workspace.getRemovedServices().remove(def.getName());
+        boolean exists = workspace.getServices().stream().anyMatch(s -> s.getName().equals(def.getName()));
+        if (!exists) {
+          workspace.getServices().add(def);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed)
+      workspace.getRemovedServices().clear();
+
     persistWorkspace();
-    return scanRoots();
+    if (!newRoots.isEmpty())
+      return scanRoots();
+
+    loadAll();
+    emitEvent.accept("workspace", om.valueToTree(workspace));
+    return om.valueToTree(services.values().stream()
+        .map(sd -> new ServiceView(sd.getDefinition().getName(), sd.getDefinition().getPath(),
+            sd.getDefinition().getCommand(), sd.getDefinition().getLogFile(), sd.getDefinition().getEnv(),
+            sd.getDefinition().getJavaHome(), sd.getDefinition().getJavaVersion(), sd.getDefinition().getContainerIds(),
+            sd.getRuntime().getPid(), sd.getRuntime().getStatus(),
+            sd.getRuntime().getLastStartAt(), sd.getRuntime().getLastStopAt(), sd.getRuntime().getLastError()))
+        .sorted(Comparator.comparing(ServiceView::name))
+        .toList());
   }
 
   public JsonNode removeRoot(String root) {
@@ -160,7 +209,7 @@ public class WorkspaceManager {
       }
     }
 
-    workspace.setServices(byName.values().stream().sorted(Comparator.comparing(ServiceDefinition::getName)).toList());
+    workspace.setServices(new ArrayList<>(byName.values().stream().sorted(Comparator.comparing(ServiceDefinition::getName)).toList()));
     persistWorkspace();
     loadAll();
     emitEvent.accept("workspace", om.valueToTree(workspace));

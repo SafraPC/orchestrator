@@ -85,6 +85,10 @@ public class ProjectScanner {
     return out;
   }
 
+  public boolean isAggregator(Path pom) {
+    return isAggregatorPom(pom);
+  }
+
   private boolean isAggregatorPom(Path pom) {
     String txt = store.readSmallText(pom, 64_000);
     if (txt == null)

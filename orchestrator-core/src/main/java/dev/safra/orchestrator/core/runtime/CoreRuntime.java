@@ -70,6 +70,14 @@ public class CoreRuntime {
       }
       case "importRootAndScan" -> workspaceManager.importRootAndScan(
           params != null && params.hasNonNull("root") ? params.get("root").asText() : null);
+      case "importRootsAndScan" -> {
+        List<String> roots = new ArrayList<>();
+        if (params != null && params.has("roots") && params.get("roots").isArray()) {
+          for (JsonNode n : params.get("roots"))
+            roots.add(n.asText());
+        }
+        yield workspaceManager.importRootsAndScan(roots);
+      }
       case "removeRoot" -> workspaceManager.removeRoot(
           params != null && params.hasNonNull("root") ? params.get("root").asText() : null);
       case "scanRoots" -> workspaceManager.scanRoots();

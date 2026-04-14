@@ -57,7 +57,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 
 ### IPC Methods (CoreRuntime.handle)
 - ping, getWorkspace, setExcludeDirs
-- importRootAndScan, removeRoot, scanRoots
+- importRootAndScan, importRootsAndScan, removeRoot, scanRoots
 - listServices, startService, stopService, restartService, startAll, stopAll
 - removeService
 - subscribeLogs, unsubscribeLogs
@@ -77,6 +77,8 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - Stale containerIds (referencing deleted containers) are cleaned during scan
 - Removed services tracked in `workspace.removedServices`; excluded from scan
 - importRootAndScan clears removedServices when adding a new root
+- importRootsAndScan: folders with pom.xml added as direct services, others as roots
+- Service removal clears containerIds before removing
 - Ports auto-detected from application.properties/yml, fallback to hash-based
 
 ## Desktop Module (Tauri + React)
@@ -84,14 +86,15 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 ### Rust (src-tauri/src/main.rs)
 - CoreBridge: spawns Java JAR, manages stdin/stdout
 - core_request: Tauri command, sends IPC request, waits for response
-- select_folder: Tauri dialog for folder selection
+- select_folder: Tauri dialog for multi-folder selection (pipe-separated)
 - Events emitted as "core_event" to UI
 
 ### React Components
 | Component | Path | Responsibility |
 |-----------|------|---------------|
 | App | ui/App.tsx | Layout, state, keyboard shortcuts |
-| ServiceTable | ui/ServiceTable.tsx | Service list, actions, context menu |
+| ServiceTable | ui/ServiceTable.tsx | Service list, actions |
+| ContextMenu | ui/ContextMenu.tsx | Service context menu with hover submenus |
 | ContainersPanel | ui/ContainersPanel.tsx | Container CRUD, start/stop container |
 | LogsPanel | ui/LogsPanel.tsx | Log stream, search, copy, level colors |
 | StatusBar | ui/StatusBar.tsx | Running/stopped/error counts |

@@ -13,6 +13,7 @@ async function core<T>(method: string, params: unknown = {}): Promise<T> {
 export const api = {
   getWorkspace: () => core<WorkspaceDto>("getWorkspace"),
   importRootAndScan: (root: string) => core<ServiceDto[]>("importRootAndScan", { root }),
+  importRootsAndScan: (roots: string[]) => core<ServiceDto[]>("importRootsAndScan", { roots }),
   scanRoots: () => core<ServiceDto[]>("scanRoots"),
   listServices: () => core<ServiceDto[]>("listServices"),
 

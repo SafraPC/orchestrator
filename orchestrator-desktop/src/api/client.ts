@@ -42,5 +42,8 @@ export const api = {
 
   listJdks: () => core<JdkInfo[]>("listJdks"),
   setServiceJavaVersion: (name: string, javaVersion: string | null) => core<ServiceDto[]>("setServiceJavaVersion", { name, javaVersion }),
+
+  reorderServices: (order: string[]) => core<void>("reorderServices", { order }),
+  reorderContainers: (order: string[]) => core<void>("reorderContainers", { order }),
 };
 

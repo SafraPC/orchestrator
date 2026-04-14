@@ -46,10 +46,7 @@ public class ServiceManager {
   public JsonNode list() {
     refreshStatuses();
     persistRuntime.run();
-    return om.valueToTree(services.values().stream()
-        .map(this::toView)
-        .sorted(Comparator.comparing(ServiceView::name))
-        .toList());
+    return om.valueToTree(sortedViews(services.values().stream().map(this::toView).toList()));
   }
 
   public JsonNode start(String name) {
@@ -203,11 +200,10 @@ public class ServiceManager {
   }
 
   public JsonNode getByContainer(String containerId) {
-    return om.valueToTree(services.values().stream()
+    return om.valueToTree(sortedViews(services.values().stream()
         .filter(sd -> hasContainer(sd, containerId))
         .map(this::toView)
-        .sorted(Comparator.comparing(ServiceView::name))
-        .toList());
+        .toList()));
   }
 
   public ServiceDescriptor requireService(String name) {
@@ -255,11 +251,19 @@ public class ServiceManager {
   }
 
   private void emitServicesChanged() {
-    List<ServiceView> views = services.values().stream()
-        .sorted(Comparator.comparing(sd -> sd.getDefinition().getName()))
-        .map(this::toView)
-        .toList();
+    List<ServiceView> views = sortedViews(services.values().stream().map(this::toView).toList());
     emitEvent.accept("services", om.valueToTree(views));
+  }
+
+  private List<ServiceView> sortedViews(List<ServiceView> views) {
+    List<String> order = workspaceSupplier.get().getServiceOrder();
+    if (order == null || order.isEmpty()) return views;
+    return views.stream()
+        .sorted(Comparator.comparingInt(v -> {
+          int idx = order.indexOf(v.name());
+          return idx >= 0 ? idx : Integer.MAX_VALUE;
+        }))
+        .toList();
   }
 
   private void scheduleHealthCheck(String name, long pid, ServiceDescriptor sd) {

@@ -135,4 +135,14 @@ export const Icon = {
       <path d="M13 13l-3-3M5 7h4" />
     </svg>
   ),
+  Grip: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <circle cx="5.5" cy="4" r="1" />
+      <circle cx="10.5" cy="4" r="1" />
+      <circle cx="5.5" cy="8" r="1" />
+      <circle cx="10.5" cy="8" r="1" />
+      <circle cx="5.5" cy="12" r="1" />
+      <circle cx="10.5" cy="12" r="1" />
+    </svg>
+  ),
 };

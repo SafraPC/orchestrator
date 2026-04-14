@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
 import { ContainersPanel } from "./ContainersPanel";
@@ -10,6 +11,8 @@ import { Toast, useToast } from "./Toast";
 import { Icon } from "./Icons";
 import { SettingsPanel, useSettings } from "./SettingsPanel";
 import { Tooltip } from "./Tooltip";
+
+type CoreEvent = { event: string; payload: unknown };
 
 export function App() {
   const [services, setServices] = useState<ServiceDto[]>([]);
@@ -25,6 +28,7 @@ export function App() {
   const { toasts, addToast, removeToast } = useToast();
   const { settings, setSettings } = useSettings();
 
+  const [loading, setLoading] = useState(true);
   const selectedService = useMemo(() => services.find((s) => s.name === selected) ?? null, [services, selected]);
 
   const refresh = useCallback(async () => {
@@ -32,10 +36,28 @@ export function App() {
     setServices(list);
     setContainers(ctrs);
     setSelected((prev) => prev && !list.some((s) => s.name === prev) ? null : prev);
+    setLoading(false);
   }, []);
 
-  useEffect(() => { void refresh(); const i = setInterval(() => void refresh(), 5000); return () => clearInterval(i); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { void api.listJdks().then(setJdks).catch(() => {}); }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    const promise = listen<CoreEvent>("core_event", (e) => {
+      if (cancel) return;
+      const { event, payload } = e.payload;
+      if (event === "service") {
+        const svc = payload as ServiceDto;
+        setServices((prev) => prev.map((s) => (s.name === svc.name ? svc : s)));
+      } else if (event === "services") {
+        setServices(payload as ServiceDto[]);
+      } else if (event === "workspace") {
+        void refresh();
+      }
+    });
+    return () => { cancel = true; void promise.then((u) => u()); };
+  }, [refresh]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -50,6 +72,26 @@ export function App() {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [selected, services, refresh, addToast]);
+
+  const handleServicesReorder = useCallback((reorderedSubset: ServiceDto[]) => {
+    setServices((prev) => {
+      const subNames = new Set(reorderedSubset.map((s) => s.name));
+      const others = prev.filter((s) => !subNames.has(s.name));
+      const merged: ServiceDto[] = [];
+      let otherIdx = 0;
+      let subIdx = 0;
+      for (const s of prev) {
+        if (subNames.has(s.name)) {
+          if (subIdx < reorderedSubset.length) merged.push(reorderedSubset[subIdx++]);
+        } else {
+          if (otherIdx < others.length) merged.push(others[otherIdx++]);
+        }
+      }
+      while (subIdx < reorderedSubset.length) merged.push(reorderedSubset[subIdx++]);
+      while (otherIdx < others.length) merged.push(others[otherIdx++]);
+      return merged;
+    });
+  }, []);
 
   const filteredServices = useMemo(() => {
     let f = selectedContainer ? services.filter((s) => s.containerIds?.includes(selectedContainer)) : services;
@@ -71,7 +113,7 @@ export function App() {
             </Tooltip>
           </div>
           <div className={`transition-opacity duration-200 ${containersCollapsed ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100 h-[calc(100%-37px)]"}`}>
-            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={async (id) => { setSelectedContainer(id); await refresh(); }} onRefresh={refresh} onContainersChanged={refresh} onToast={addToast} />
+            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={async (id) => { setSelectedContainer(id); await refresh(); }} onRefresh={refresh} onContainersChanged={refresh} onContainersReorder={setContainers} onToast={addToast} />
           </div>
         </aside>
         {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={140} max={320} />}
@@ -86,7 +128,7 @@ export function App() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-            <ServiceTable services={filteredServices} selected={selected} onSelect={setSelected} onAction={refresh} onServicesUpdate={setServices} selectedContainer={selectedContainer} containers={containers} jdks={jdks} onToast={addToast} />
+            <ServiceTable services={filteredServices} allServices={services} selected={selected} onSelect={setSelected} onAction={refresh} onServicesUpdate={handleServicesReorder} selectedContainer={selectedContainer} containers={containers} jdks={jdks} onToast={addToast} loading={loading} />
           </div>
           <StatusBar services={services} selectedContainer={selectedContainer} filteredCount={filteredServices.length} />
         </section>

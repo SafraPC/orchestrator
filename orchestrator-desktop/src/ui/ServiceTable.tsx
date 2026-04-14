@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
 import { ContextMenu } from "./ContextMenu";
@@ -6,6 +6,7 @@ import { Icon } from "./Icons";
 import { Modal } from "./Modal";
 import type { ToastType } from "./Toast";
 import { Tooltip } from "./Tooltip";
+import { useDragReorder } from "./useDragReorder";
 
 function uptime(at: string | null | undefined): string | null {
   if (!at) return null;
@@ -19,15 +20,12 @@ function uptime(at: string | null | undefined): string | null {
 }
 
 export function ServiceTable(props: {
-  services: ServiceDto[];
-  selected: string | null;
-  onSelect: (name: string) => void;
-  onAction: () => Promise<void>;
-  onServicesUpdate?: (s: ServiceDto[]) => void;
-  selectedContainer?: string | null;
-  containers?: ContainerDto[];
-  jdks?: JdkInfo[];
-  onToast?: (t: ToastType, m: string) => void;
+  services: ServiceDto[]; allServices?: ServiceDto[];
+  selected: string | null; onSelect: (name: string) => void;
+  onAction: () => Promise<void>; onServicesUpdate?: (s: ServiceDto[]) => void;
+  selectedContainer?: string | null; containers?: ContainerDto[];
+  jdks?: JdkInfo[]; onToast?: (t: ToastType, m: string) => void;
+  loading?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const containers = props.containers ?? [];
@@ -35,73 +33,74 @@ export function ServiceTable(props: {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [rmContTarget, setRmContTarget] = useState<{ svc: string; cid: string; cname: string } | null>(null);
 
+  const allSvcs = props.allServices ?? props.services;
+  const handleReorder = useCallback((reordered: ServiceDto[]) => {
+    props.onServicesUpdate?.(reordered);
+    const subNames = new Set(reordered.map((s) => s.name));
+    const otherNames = allSvcs.filter((s) => !subNames.has(s.name)).map((s) => s.name);
+    const merged: string[] = [];
+    let oIdx = 0, sIdx = 0;
+    for (const s of allSvcs) {
+      if (subNames.has(s.name)) { if (sIdx < reordered.length) merged.push(reordered[sIdx++].name); }
+      else { if (oIdx < otherNames.length) merged.push(otherNames[oIdx++]); }
+    }
+    void api.reorderServices(merged);
+  }, [props.onServicesUpdate, allSvcs]);
+
+  const { items: orderedServices, containerRef, gripProps, activeId } = useDragReorder(
+    props.services, (s) => s.name, handleReorder
+  );
+
   async function addTo(svc: string, cid: string) {
     setMenuOpen(null);
-    try {
-      const u = await api.addServiceToContainer(svc, cid);
-      props.onServicesUpdate?.(u);
-      await props.onAction();
-    } catch (e) {
-      props.onToast?.("error", String(e));
-    }
+    try { const u = await api.addServiceToContainer(svc, cid); props.onServicesUpdate?.(u); await props.onAction(); }
+    catch (e) { props.onToast?.("error", String(e)); }
   }
 
   async function confirmRemoveService() {
     if (!deleteTarget) return;
     const name = deleteTarget;
     setDeleteTarget(null);
-    try {
-      await api.removeService(name);
-      await props.onAction();
-    } catch (e) {
-      props.onToast?.("error", String(e));
-    }
+    try { await api.removeService(name); await props.onAction(); props.onToast?.("success", `"${name}" removido`); }
+    catch (e) { props.onToast?.("error", String(e)); }
   }
 
   async function confirmRmCont() {
     if (!rmContTarget) return;
-    try {
-      const u = await api.removeServiceFromContainer(rmContTarget.svc, rmContTarget.cid);
-      props.onServicesUpdate?.(u);
-      await props.onAction();
-    } catch (e) {
-      props.onToast?.("error", String(e));
-    }
+    try { const u = await api.removeServiceFromContainer(rmContTarget.svc, rmContTarget.cid); props.onServicesUpdate?.(u); await props.onAction(); }
+    catch (e) { props.onToast?.("error", String(e)); }
     setRmContTarget(null);
   }
 
+  if (props.loading) {
+    return (
+      <div className="px-2 pb-2 space-y-2">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="rounded-lg border border-white/[0.04] bg-surface-1 px-3 py-3 animate-pulse" style={{ animationDelay: `${i * 80}ms` }}>
+            <div className="flex items-center gap-2">
+              <div className="h-3.5 w-3.5 rounded bg-surface-3" />
+              <div className="h-2 w-2 rounded-full bg-surface-3" />
+              <div className="h-3 rounded bg-surface-3" style={{ width: `${60 + i * 15}px` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="px-2 pb-2 space-y-1 select-none">
-      {props.services.map((s, idx) => (
-        <ServiceRow
-          key={s.name}
-          s={s}
-          idx={idx}
-          sel={props.selected === s.name}
-          busy={busy}
-          containers={containers}
-          jdks={props.jdks ?? []}
-          menuOpen={menuOpen === s.name}
+    <div ref={containerRef} className="px-2 pb-2 space-y-2 select-none">
+      {orderedServices.map((s) => (
+        <ServiceRow key={s.name} s={s} sel={props.selected === s.name} busy={busy}
+          containers={containers} jdks={props.jdks ?? []} menuOpen={menuOpen === s.name}
+          isDragging={activeId === s.name} gripProps={gripProps(s.name)}
           onSelect={() => props.onSelect(s.name)}
           onMenuToggle={() => setMenuOpen(menuOpen === s.name ? null : s.name)}
           onMenuClose={() => setMenuOpen(null)}
           onDelete={() => { setMenuOpen(null); setDeleteTarget(s.name); }}
           onAdd={addTo}
-          onRemove={(svc, cid) => {
-            const c = containers.find((ct) => ct.id === cid);
-            setMenuOpen(null);
-            setRmContTarget({ svc, cid, cname: c?.name ?? "" });
-          }}
-          onSetJava={async (name, ver) => {
-            setMenuOpen(null);
-            try {
-              const u = await api.setServiceJavaVersion(name, ver);
-              props.onServicesUpdate?.(u);
-              props.onToast?.("success", `Java ${ver ?? "padrão"} → ${name}`);
-            } catch (e) {
-              props.onToast?.("error", String(e));
-            }
-          }}
+          onRemove={(svc, cid) => { const c = containers.find((ct) => ct.id === cid); setMenuOpen(null); setRmContTarget({ svc, cid, cname: c?.name ?? "" }); }}
+          onSetJava={async (name, ver) => { setMenuOpen(null); try { const u = await api.setServiceJavaVersion(name, ver); props.onServicesUpdate?.(u); props.onToast?.("success", `Java ${ver ?? "padrão"} → ${name}`); } catch (e) { props.onToast?.("error", String(e)); } }}
           onStart={async () => { setBusy(s.name); try { await api.start(s.name); await props.onAction(); } finally { setBusy(null); } }}
           onStop={async () => { setBusy(s.name); try { await api.stop(s.name); await props.onAction(); } finally { setBusy(null); } }}
           onRestart={async () => { setBusy(s.name); try { await api.restart(s.name); await props.onAction(); } finally { setBusy(null); } }}
@@ -123,8 +122,9 @@ export function ServiceTable(props: {
 }
 
 function ServiceRow(props: {
-  s: ServiceDto; idx: number; sel: boolean; busy: string | null;
+  s: ServiceDto; sel: boolean; busy: string | null;
   containers: ContainerDto[]; jdks: JdkInfo[]; menuOpen: boolean;
+  isDragging: boolean; gripProps: { onMouseDown: (e: React.MouseEvent) => void };
   onSelect: () => void; onMenuToggle: () => void; onMenuClose: () => void;
   onDelete: () => void; onAdd: (s: string, c: string) => Promise<void>;
   onRemove: (s: string, c: string) => void;
@@ -139,12 +139,15 @@ function ServiceRow(props: {
   const isError = s.status === "ERROR";
 
   return (
-    <div
-      className={`group relative animate-fade-in rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-150 ${sel ? "border-accent/25 bg-accent/[0.04] shadow-glow" : "border-transparent hover:border-white/[0.04] hover:bg-surface-2"}`}
-      style={{ animationDelay: `${props.idx * 30}ms` }}
+    <div data-drag-item
+      className={`group relative rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-200 ${sel ? "border-accent/25 bg-accent/[0.06] shadow-glow" : "border-white/[0.06] bg-surface-1 hover:border-white/[0.10] hover:bg-surface-2"} ${props.isDragging ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30 bg-accent/[0.06]" : ""}`}
       onClick={props.onSelect}
     >
       <div className="flex items-center gap-2 min-w-0">
+        <span className="shrink-0 cursor-grab active:cursor-grabbing text-slate-600 opacity-40 group-hover:opacity-100 group-hover:text-slate-400 transition-all"
+          {...props.gripProps}>
+          <Icon.Grip className="h-3.5 w-3.5" />
+        </span>
         <span className="relative flex h-2 w-2 shrink-0">
           {isRunning && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-50" />}
           <span className={`relative inline-flex h-2 w-2 rounded-full ${isRunning ? "bg-accent" : isError ? "bg-danger" : "bg-slate-600"}`} />

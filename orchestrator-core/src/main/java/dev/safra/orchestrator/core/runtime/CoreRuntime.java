@@ -88,6 +88,20 @@ public class CoreRuntime {
       case "startAll" -> serviceManager.startAll();
       case "stopAll" -> serviceManager.stopAll();
       case "removeService" -> serviceManager.remove(reqName(params));
+      case "reorderServices" -> {
+        List<String> order = new ArrayList<>();
+        if (params != null && params.has("order") && params.get("order").isArray()) {
+          for (JsonNode n : params.get("order")) order.add(n.asText());
+        }
+        yield workspaceManager.reorderServices(order);
+      }
+      case "reorderContainers" -> {
+        List<String> order = new ArrayList<>();
+        if (params != null && params.has("order") && params.get("order").isArray()) {
+          for (JsonNode n : params.get("order")) order.add(n.asText());
+        }
+        yield workspaceManager.reorderContainers(order);
+      }
       case "subscribeLogs" -> {
         String name = reqName(params);
         int tail = params != null && params.has("tail") ? params.get("tail").asInt(200) : 200;

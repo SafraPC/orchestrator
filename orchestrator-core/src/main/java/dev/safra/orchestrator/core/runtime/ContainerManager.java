@@ -1,6 +1,8 @@
 package dev.safra.orchestrator.core.runtime;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -73,7 +75,16 @@ public class ContainerManager {
   }
 
   public JsonNode list() {
-    return om.valueToTree(ws().getContainers().values());
+    Workspace w = ws();
+    List<String> order = w.getContainerOrder();
+    List<Container> sorted = new ArrayList<>(w.getContainers().values());
+    if (order != null && !order.isEmpty()) {
+      sorted.sort(Comparator.comparingInt(c -> {
+        int idx = order.indexOf(c.getId());
+        return idx >= 0 ? idx : Integer.MAX_VALUE;
+      }));
+    }
+    return om.valueToTree(sorted);
   }
 
   public void addService(String serviceName, String containerId) {

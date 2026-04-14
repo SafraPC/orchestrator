@@ -17,4 +17,6 @@ public class Workspace {
   private List<dev.safra.orchestrator.model.ServiceDefinition> services = new ArrayList<>();
   private Map<String, Container> containers = new HashMap<>();
   private Set<String> removedServices = new HashSet<>();
+  private List<String> serviceOrder = new ArrayList<>();
+  private List<String> containerOrder = new ArrayList<>();
 }

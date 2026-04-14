@@ -27,10 +27,18 @@ export function ImportSection(props: {
       } else {
         paths = [rootInput.trim()];
       }
+      const before = await api.listServices();
+      const beforeNames = new Set(before.map((s) => s.name));
       const result = await api.importRootsAndScan(paths);
-      const count = Array.isArray(result) ? result.length : 0;
-      if (count > 0) {
-        props.addToast("success", `${count} serviço(s) descoberto(s)`);
+      const all = Array.isArray(result) ? result : [];
+      const added = all.filter((s) => !beforeNames.has(s.name));
+      if (added.length > 0) {
+        const names = added.map((s) => s.name).join(", ");
+        props.addToast("success", `${added.length} novo(s): ${names}`);
+        setRootInput("");
+        await props.onImported();
+      } else if (all.length > 0) {
+        props.addToast("info", "Nenhum serviço novo encontrado.");
         setRootInput("");
         await props.onImported();
       } else {

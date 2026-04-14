@@ -103,6 +103,8 @@ public class WorkspaceManager {
       sd.setRuntime(rt);
       services.put(def.getName(), sd);
     }
+    syncServiceOrder();
+    syncContainerOrder();
     persistRuntime();
     persistWorkspace();
   }
@@ -159,14 +161,7 @@ public class WorkspaceManager {
 
     loadAll();
     emitEvent.accept("workspace", om.valueToTree(workspace));
-    return om.valueToTree(services.values().stream()
-        .map(sd -> new ServiceView(sd.getDefinition().getName(), sd.getDefinition().getPath(),
-            sd.getDefinition().getCommand(), sd.getDefinition().getLogFile(), sd.getDefinition().getEnv(),
-            sd.getDefinition().getJavaHome(), sd.getDefinition().getJavaVersion(), sd.getDefinition().getContainerIds(),
-            sd.getRuntime().getPid(), sd.getRuntime().getStatus(),
-            sd.getRuntime().getLastStartAt(), sd.getRuntime().getLastStopAt(), sd.getRuntime().getLastError()))
-        .sorted(Comparator.comparing(ServiceView::name))
-        .toList());
+    return buildSortedServiceList();
   }
 
   public JsonNode removeRoot(String root) {
@@ -209,20 +204,76 @@ public class WorkspaceManager {
       }
     }
 
-    workspace.setServices(new ArrayList<>(byName.values().stream().sorted(Comparator.comparing(ServiceDefinition::getName)).toList()));
+    workspace.setServices(new ArrayList<>(byName.values()));
+    syncServiceOrder();
+    syncContainerOrder();
     persistWorkspace();
     loadAll();
     emitEvent.accept("workspace", om.valueToTree(workspace));
 
-    return om.valueToTree(services.values().stream()
-        .map(sd -> new ServiceView(sd.getDefinition().getName(), sd.getDefinition().getPath(),
-            sd.getDefinition().getCommand(),
-            sd.getDefinition().getLogFile(), sd.getDefinition().getEnv(), sd.getDefinition().getJavaHome(),
-            sd.getDefinition().getJavaVersion(), sd.getDefinition().getContainerIds(),
-            sd.getRuntime().getPid(), sd.getRuntime().getStatus(),
-            sd.getRuntime().getLastStartAt(), sd.getRuntime().getLastStopAt(), sd.getRuntime().getLastError()))
-        .sorted(Comparator.comparing(ServiceView::name))
-        .toList());
+    return buildSortedServiceList();
+  }
+
+  private JsonNode buildSortedServiceList() {
+    return om.valueToTree(sortedViews(services.values().stream()
+        .map(this::toView).toList()));
+  }
+
+  private ServiceView toView(ServiceDescriptor sd) {
+    var d = sd.getDefinition();
+    var r = sd.getRuntime();
+    return new ServiceView(d.getName(), d.getPath(), d.getCommand(), d.getLogFile(),
+        d.getEnv(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
+        r.getPid(), r.getStatus(), r.getLastStartAt(), r.getLastStopAt(), r.getLastError());
+  }
+
+  public JsonNode reorderServices(List<String> order) {
+    workspace.setServiceOrder(order != null ? new ArrayList<>(order) : new ArrayList<>());
+    persistWorkspace();
+    return om.valueToTree(workspace);
+  }
+
+  public JsonNode reorderContainers(List<String> order) {
+    workspace.setContainerOrder(order != null ? new ArrayList<>(order) : new ArrayList<>());
+    persistWorkspace();
+    return om.valueToTree(workspace);
+  }
+
+  public void syncServiceOrder() {
+    List<String> order = workspace.getServiceOrder();
+    if (order == null) {
+      workspace.setServiceOrder(new ArrayList<>());
+      order = workspace.getServiceOrder();
+    }
+    List<String> existing = workspace.getServices().stream().map(ServiceDefinition::getName).toList();
+    order.retainAll(existing);
+    for (String name : existing) {
+      if (!order.contains(name)) order.add(name);
+    }
+  }
+
+  public void syncContainerOrder() {
+    List<String> order = workspace.getContainerOrder();
+    if (order == null) {
+      workspace.setContainerOrder(new ArrayList<>());
+      order = workspace.getContainerOrder();
+    }
+    List<String> existing = new ArrayList<>(workspace.getContainers().keySet());
+    order.retainAll(existing);
+    for (String id : existing) {
+      if (!order.contains(id)) order.add(id);
+    }
+  }
+
+  List<ServiceView> sortedViews(List<ServiceView> views) {
+    List<String> order = workspace.getServiceOrder();
+    if (order == null || order.isEmpty()) return views;
+    return views.stream()
+        .sorted(Comparator.comparingInt(v -> {
+          int idx = order.indexOf(v.name());
+          return idx >= 0 ? idx : Integer.MAX_VALUE;
+        }))
+        .toList();
   }
 
   public void persistWorkspace() {

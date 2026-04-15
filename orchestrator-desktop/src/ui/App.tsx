@@ -42,12 +42,18 @@ export function App() {
   const selectedService = useMemo(() => services.find((s) => s.name === selected) ?? null, [services, selected]);
 
   const refresh = useCallback(async () => {
-    const [list, ctrs] = await Promise.all([api.listServices(), api.listContainers()]);
-    setServices(list);
-    setContainers(ctrs);
-    setSelected((prev) => (prev && !list.some((s) => s.name === prev) ? null : prev));
-    setLoading(false);
-  }, []);
+    try {
+      const [list, ctrs] = await Promise.all([api.listServices(), api.listContainers()]);
+      setServices(list);
+      setContainers(ctrs);
+      setSelected((prev) => (prev && !list.some((s) => s.name === prev) ? null : prev));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addToast("error", message);
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
 
   useEffect(() => {
     void refresh();

@@ -1,6 +1,6 @@
 [package]
 name = "Orchestrator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Spring Dev Orchestrator Desktop (Tauri)"
 authors = ["Leandro Safra"]
 edition = "2021"

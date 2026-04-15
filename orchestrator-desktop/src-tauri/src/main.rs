@@ -79,6 +79,18 @@ fn spawn_core(app: &tauri::AppHandle) -> std::io::Result<(Child, ChildStdin, std
   let stderr_file = fs::File::create(log_dir.join("core.stderr.log"))?;
 
   let full_path = shell_path();
+  let java_check = Command::new("java")
+    .arg("-version")
+    .env("PATH", &full_path)
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .status();
+  if java_check.is_err() {
+    return Err(std::io::Error::new(
+      std::io::ErrorKind::NotFound,
+      "Java não encontrado no PATH. Instale Java 17+ para executar o core.",
+    ));
+  }
 
   let mut child = Command::new("java")
     .args([
@@ -209,11 +221,15 @@ impl CoreBridge {
 }
 
 #[tauri::command]
-async fn core_request(bridge: State<'_, CoreBridge>, method: String, params: Value) -> Result<Value, String> {
+async fn core_request(app: tauri::AppHandle, bridge: State<'_, CoreBridge>, method: String, params: Value) -> Result<Value, String> {
   let bridge = bridge.inner().clone();
-  let resp: Value = tauri::async_runtime::spawn_blocking(move || bridge.send_request(&method, params))
-    .await
-    .map_err(|e| format!("Task falhou: {e}"))??;
+  let app_handle = app.clone();
+  let resp: Value = tauri::async_runtime::spawn_blocking(move || {
+    bridge.ensure_started(&app_handle)?;
+    bridge.send_request(&method, params)
+  })
+  .await
+  .map_err(|e| format!("Task falhou: {e}"))??;
 
   if resp.get("ok").and_then(|v: &Value| v.as_bool()).unwrap_or(false) {
     Ok(resp.get("result").cloned().unwrap_or(Value::Null))

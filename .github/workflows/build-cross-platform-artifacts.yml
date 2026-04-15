@@ -27,7 +27,7 @@ jobs:
             artifact_glob: |
               orchestrator-desktop/src-tauri/target/release/bundle/deb/*.deb
               orchestrator-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-          - os: macos-13
+          - os: macos-latest
             artifact_name: mac-installers
             tauri_bundles: "dmg"
             artifact_glob: |

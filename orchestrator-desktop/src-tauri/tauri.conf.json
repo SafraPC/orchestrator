@@ -11,7 +11,9 @@
   },
   "app": {
     "security": {
-      "capabilities": ["main-capabilities"]
+      "capabilities": [
+        "main-capabilities"
+      ]
     },
     "windows": [
       {

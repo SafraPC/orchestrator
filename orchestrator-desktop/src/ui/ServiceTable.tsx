@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useCallback, useState } from "react";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
 import { ContextMenu } from "./ContextMenu";
@@ -134,20 +134,76 @@ export function ServiceTable(props: {
   return (
     <div ref={containerRef} className="px-2 pb-2 space-y-2 select-none">
       {orderedServices.map((s) => (
-        <ServiceRow key={s.name} s={s} sel={props.selected === s.name} busy={busy}
-          containers={containers} jdks={props.jdks ?? []} menuOpen={menuOpen === s.name}
-          isDragging={activeId === s.name} gripProps={gripProps(s.name)}
+        <ServiceRow
+          key={s.name}
+          s={s}
+          sel={props.selected === s.name}
+          busy={busy}
+          containers={containers}
+          jdks={props.jdks ?? []}
+          menuOpen={menuOpen === s.name}
+          isDragging={activeId === s.name}
+          gripProps={gripProps(s.name)}
           onSelect={() => props.onSelect(s.name)}
           onMenuToggle={() => setMenuOpen(menuOpen === s.name ? null : s.name)}
           onMenuClose={() => setMenuOpen(null)}
-          onDelete={() => { setMenuOpen(null); setDeleteTarget(s.name); }}
+          onDelete={() => {
+            setMenuOpen(null);
+            setDeleteTarget(s.name);
+          }}
           onAdd={addTo}
-          onRemove={(svc, cid) => { const c = containers.find((ct) => ct.id === cid); setMenuOpen(null); setRmContTarget({ svc, cid, cname: c?.name ?? "" }); }}
-          onSetJava={async (name, ver) => { setMenuOpen(null); try { const u = await api.setServiceJavaVersion(name, ver); props.onServicesUpdate?.(u); props.onToast?.("success", `Java ${ver ?? "padrão"} → ${name}`); } catch (e) { props.onToast?.("error", String(e)); } }}
-          onSetScript={async (name, script) => { setMenuOpen(null); try { const u = await api.setServiceScript(name, script); props.onServicesUpdate?.(u); props.onToast?.("success", `npm run ${script} → ${name}`); } catch (e) { props.onToast?.("error", String(e)); } }}
-          onStart={async () => { setBusy(s.name); try { await api.start(s.name); await props.onAction(); } finally { setBusy(null); } }}
-          onStop={async () => { setBusy(s.name); try { await api.stop(s.name); await props.onAction(); } finally { setBusy(null); } }}
-          onRestart={async () => { setBusy(s.name); try { await api.restart(s.name); await props.onAction(); } finally { setBusy(null); } }}
+          onRemove={(svc, cid) => {
+            const c = containers.find((ct) => ct.id === cid);
+            setMenuOpen(null);
+            setRmContTarget({ svc, cid, cname: c?.name ?? "" });
+          }}
+          onSetJava={async (name, ver) => {
+            setMenuOpen(null);
+            try {
+              const u = await api.setServiceJavaVersion(name, ver);
+              props.onServicesUpdate?.(u);
+              props.onToast?.("success", `Java ${ver ?? "padrão"} → ${name}`);
+            } catch (e) {
+              props.onToast?.("error", String(e));
+            }
+          }}
+          onSetScript={async (name, script) => {
+            setMenuOpen(null);
+            try {
+              const u = await api.setServiceScript(name, script);
+              props.onServicesUpdate?.(u);
+              props.onToast?.("success", `npm run ${script} → ${name}`);
+            } catch (e) {
+              props.onToast?.("error", String(e));
+            }
+          }}
+          onStart={async () => {
+            setBusy(s.name);
+            try {
+              await api.start(s.name);
+              await props.onAction();
+            } finally {
+              setBusy(null);
+            }
+          }}
+          onStop={async () => {
+            setBusy(s.name);
+            try {
+              await api.stop(s.name);
+              await props.onAction();
+            } finally {
+              setBusy(null);
+            }
+          }}
+          onRestart={async () => {
+            setBusy(s.name);
+            try {
+              await api.restart(s.name);
+              await props.onAction();
+            } finally {
+              setBusy(null);
+            }
+          }}
         />
       ))}
       {props.services.length === 0 && (
@@ -157,24 +213,48 @@ export function ServiceTable(props: {
           <p className="text-2xs text-slate-700 mt-1">Importe um projeto para começar</p>
         </div>
       )}
-      <Modal open={!!deleteTarget} title="Remover serviço" message={`Remover "${deleteTarget}"?\nIsso não deleta o projeto.`}
-        kind="danger" confirmLabel="Remover" onConfirm={() => void confirmRemoveService()} onCancel={() => setDeleteTarget(null)} />
-      <Modal open={!!rmContTarget} title="Remover do container" message={`Remover serviço de "${rmContTarget?.cname}"?`}
-        kind="warning" confirmLabel="Remover" onConfirm={() => void confirmRmCont()} onCancel={() => setRmContTarget(null)} />
+      <Modal
+        open={!!deleteTarget}
+        title="Remover serviço"
+        message={`Remover "${deleteTarget}"?\nIsso não deleta o projeto.`}
+        kind="danger"
+        confirmLabel="Remover"
+        onConfirm={() => void confirmRemoveService()}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      <Modal
+        open={!!rmContTarget}
+        title="Remover do container"
+        message={`Remover serviço de "${rmContTarget?.cname}"?`}
+        kind="warning"
+        confirmLabel="Remover"
+        onConfirm={() => void confirmRmCont()}
+        onCancel={() => setRmContTarget(null)}
+      />
     </div>
   );
 }
 
 function ServiceRow(props: {
-  s: ServiceDto; sel: boolean; busy: string | null;
-  containers: ContainerDto[]; jdks: JdkInfo[]; menuOpen: boolean;
-  isDragging: boolean; gripProps: { onMouseDown: (e: React.MouseEvent) => void };
-  onSelect: () => void; onMenuToggle: () => void; onMenuClose: () => void;
-  onDelete: () => void; onAdd: (s: string, c: string) => Promise<void>;
+  s: ServiceDto;
+  sel: boolean;
+  busy: string | null;
+  containers: ContainerDto[];
+  jdks: JdkInfo[];
+  menuOpen: boolean;
+  isDragging: boolean;
+  gripProps: { onMouseDown: (e: React.MouseEvent) => void };
+  onSelect: () => void;
+  onMenuToggle: () => void;
+  onMenuClose: () => void;
+  onDelete: () => void;
+  onAdd: (s: string, c: string) => Promise<void>;
   onRemove: (s: string, c: string) => void;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
-  onStart: () => Promise<void>; onStop: () => Promise<void>; onRestart: () => Promise<void>;
+  onStart: () => Promise<void>;
+  onStop: () => Promise<void>;
+  onRestart: () => Promise<void>;
 }) {
   const { s, sel, containers } = props;
   const isBusy = props.busy === s.name;
@@ -188,7 +268,11 @@ function ServiceRow(props: {
       data-drag-item
       className={`group relative rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-200 ${sel ? "border-accent/25 bg-accent/[0.06] shadow-glow" : "border-white/[0.06] bg-surface-1 hover:border-white/[0.10] hover:bg-surface-2"} ${props.isDragging ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30 bg-accent/[0.06]" : ""}`}
       onClick={props.onSelect}
-      onContextMenu={(e) => { e.preventDefault(); props.onSelect(); props.onMenuToggle(); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        props.onSelect();
+        props.onMenuToggle();
+      }}
     >
       <div className="flex items-center gap-2 min-w-0">
         <span
@@ -208,33 +292,70 @@ function ServiceRow(props: {
         <span className={`truncate text-xs font-medium ${sel ? "text-slate-100" : "text-slate-200"}`}>{s.name}</span>
         <TechBadge projectType={s.projectType} javaVersion={s.javaVersion} />
         <div className="ml-auto flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          {!isRunning && <Tooltip text="Iniciar"><ActionBtn icon="Play" cls="text-accent hover:bg-accent/10" disabled={isBusy} onClick={props.onStart} /></Tooltip>}
+          {!isRunning && (
+            <Tooltip text="Iniciar">
+              <ActionBtn icon="Play" cls="text-accent hover:bg-accent/10" disabled={isBusy} onClick={props.onStart} />
+            </Tooltip>
+          )}
           {isRunning && (
             <>
-              <Tooltip text="Parar"><ActionBtn icon="Stop" cls="text-danger hover:bg-danger/10" disabled={isBusy} onClick={props.onStop} /></Tooltip>
-              <Tooltip text="Reiniciar"><ActionBtn icon="Restart" cls="text-slate-400 hover:bg-white/5" disabled={isBusy} onClick={props.onRestart} /></Tooltip>
+              <Tooltip text="Parar">
+                <ActionBtn icon="Stop" cls="text-danger hover:bg-danger/10" disabled={isBusy} onClick={props.onStop} />
+              </Tooltip>
+              <Tooltip text="Reiniciar">
+                <ActionBtn
+                  icon="Restart"
+                  cls="text-slate-400 hover:bg-white/5"
+                  disabled={isBusy}
+                  onClick={props.onRestart}
+                />
+              </Tooltip>
             </>
           )}
           <div className="relative">
-            <Tooltip text="Menu"><ActionBtn icon="Dots" cls="text-slate-500 hover:bg-white/5" onClick={props.onMenuToggle} /></Tooltip>
+            <Tooltip text="Menu">
+              <ActionBtn icon="Dots" cls="text-slate-500 hover:bg-white/5" onClick={props.onMenuToggle} />
+            </Tooltip>
             {props.menuOpen && (
-              <ContextMenu s={s} port={port} containers={containers} jdks={props.jdks}
-                onAdd={props.onAdd} onRemove={props.onRemove} onClose={props.onMenuClose}
-                onDelete={props.onDelete} onSetJava={props.onSetJava} onSetScript={props.onSetScript} />
+              <ContextMenu
+                s={s}
+                port={port}
+                containers={containers}
+                jdks={props.jdks}
+                onAdd={props.onAdd}
+                onRemove={props.onRemove}
+                onClose={props.onMenuClose}
+                onDelete={props.onDelete}
+                onSetJava={props.onSetJava}
+                onSetScript={props.onSetScript}
+              />
             )}
           </div>
         </div>
       </div>
       {(port || ut || s.pid || (s.containerIds && s.containerIds.length > 0)) && (
         <div className="mt-1.5 ml-4 flex items-center gap-2 flex-wrap">
-          {port && <span className="text-2xs text-accent/70 font-mono cursor-pointer hover:text-accent transition-colors"
-            onClick={(e) => { e.stopPropagation(); void openUrl(`http://localhost:${port}`).catch(() => {}); }}>PORT:{port}</span>}
+          {port && (
+            <span
+              className="text-2xs text-accent/70 font-mono cursor-pointer hover:text-accent transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openUrl(`http://localhost:${port}`).catch(() => {});
+              }}
+            >
+              PORT:{port}
+            </span>
+          )}
           {port && s.pid && <span className="text-2xs text-slate-600 select-none">|</span>}
           {s.pid && <span className="text-2xs text-slate-500 font-mono">PID {s.pid}</span>}
           {ut && <span className="text-2xs text-accent/40 font-mono tabular-nums">{ut}</span>}
           {s.containerIds?.map((cid) => {
             const c = containers.find((ct) => ct.id === cid);
-            return c ? <span key={cid} className="badge bg-accent/8 text-accent/70">{c.name}</span> : null;
+            return c ? (
+              <span key={cid} className="badge bg-accent/8 text-accent/70">
+                {c.name}
+              </span>
+            ) : null;
           })}
         </div>
       )}
@@ -243,11 +364,22 @@ function ServiceRow(props: {
   );
 }
 
-function ActionBtn(props: { icon: keyof typeof Icon; cls: string; disabled?: boolean; onClick: () => void | Promise<void> }) {
+function ActionBtn(props: {
+  icon: keyof typeof Icon;
+  cls: string;
+  disabled?: boolean;
+  onClick: () => void | Promise<void>;
+}) {
   const Ic = Icon[props.icon];
   return (
-    <button className={`rounded-md p-1 transition-all duration-100 disabled:opacity-30 ${props.cls}`} disabled={props.disabled}
-      onClick={(e) => { e.stopPropagation(); void props.onClick(); }}>
+    <button
+      className={`rounded-md p-1 transition-all duration-100 disabled:opacity-30 ${props.cls}`}
+      disabled={props.disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        void props.onClick();
+      }}
+    >
       <Ic className="h-3 w-3" />
     </button>
   );
@@ -261,7 +393,9 @@ function TechBadge(props: { projectType?: ProjectType; javaVersion?: string | nu
   const label = type === "SPRING_BOOT" && props.javaVersion ? `J${props.javaVersion}` : badge.label;
   return (
     <Tooltip text={badge.label}>
-      <span className={`shrink-0 inline-flex items-center gap-0.5 rounded bg-surface-3 px-1 py-px text-[9px] font-mono font-semibold leading-none ${badge.color}`}>
+      <span
+        className={`shrink-0 inline-flex items-center gap-0.5 rounded bg-surface-3 px-1 py-px text-[9px] font-mono font-semibold leading-none ${badge.color}`}
+      >
         <Ic className="h-3.5 w-3.5" />
         {label}
       </span>

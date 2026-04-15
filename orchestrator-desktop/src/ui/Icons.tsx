@@ -183,8 +183,26 @@ export const Icon = {
     <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
       <circle cx="8" cy="8" r="1.5" />
       <ellipse cx="8" cy="8" rx="7" ry="2.8" fill="none" stroke="currentColor" strokeWidth="0.8" />
-      <ellipse cx="8" cy="8" rx="7" ry="2.8" fill="none" stroke="currentColor" strokeWidth="0.8" transform="rotate(60 8 8)" />
-      <ellipse cx="8" cy="8" rx="7" ry="2.8" fill="none" stroke="currentColor" strokeWidth="0.8" transform="rotate(120 8 8)" />
+      <ellipse
+        cx="8"
+        cy="8"
+        rx="7"
+        ry="2.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.8"
+        transform="rotate(60 8 8)"
+      />
+      <ellipse
+        cx="8"
+        cy="8"
+        rx="7"
+        ry="2.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.8"
+        transform="rotate(120 8 8)"
+      />
     </svg>
   ),
   Vue: (p: { className?: string }) => (

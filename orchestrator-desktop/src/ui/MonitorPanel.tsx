@@ -4,23 +4,63 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
-import { Tooltip } from "./Tooltip";
 import type { ToastType } from "./Toast";
+import { Tooltip } from "./Tooltip";
 
 type CoreEvent = { event: string; payload: Record<string, unknown> };
 type MonitorLine = { service: string; line: string };
 
 const BADGE_COLORS = [
-  "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#a855f7",
-  "#d946ef", "#ec4899", "#14b8a6", "#0ea5e9", "#6366f1",
-  "#22c55e", "#0891b2", "#2563eb", "#7c3aed", "#9333ea",
-  "#c026d3", "#db2777", "#0d9488", "#0284c7", "#4f46e5",
-  "#16a34a", "#0e7490", "#1d4ed8", "#6d28d9", "#7e22ce",
-  "#a21caf", "#be185d", "#0f766e", "#0369a1", "#4338ca",
-  "#15803d", "#155e75", "#1e40af", "#5b21b6", "#6b21a8",
-  "#86198f", "#9d174d", "#115e59", "#075985", "#3730a3",
-  "#166534", "#164e63", "#1e3a8a", "#4c1d95", "#581c87",
-  "#701a75", "#831843", "#134e4a", "#0c4a6e", "#312e81",
+  "#10b981",
+  "#06b6d4",
+  "#3b82f6",
+  "#8b5cf6",
+  "#a855f7",
+  "#d946ef",
+  "#ec4899",
+  "#14b8a6",
+  "#0ea5e9",
+  "#6366f1",
+  "#22c55e",
+  "#0891b2",
+  "#2563eb",
+  "#7c3aed",
+  "#9333ea",
+  "#c026d3",
+  "#db2777",
+  "#0d9488",
+  "#0284c7",
+  "#4f46e5",
+  "#16a34a",
+  "#0e7490",
+  "#1d4ed8",
+  "#6d28d9",
+  "#7e22ce",
+  "#a21caf",
+  "#be185d",
+  "#0f766e",
+  "#0369a1",
+  "#4338ca",
+  "#15803d",
+  "#155e75",
+  "#1e40af",
+  "#5b21b6",
+  "#6b21a8",
+  "#86198f",
+  "#9d174d",
+  "#115e59",
+  "#075985",
+  "#3730a3",
+  "#166534",
+  "#164e63",
+  "#1e3a8a",
+  "#4c1d95",
+  "#581c87",
+  "#701a75",
+  "#831843",
+  "#134e4a",
+  "#0c4a6e",
+  "#312e81",
 ];
 
 function getColor(index: number): string {
@@ -57,7 +97,9 @@ export function MonitorPanel(props: {
   }, [serviceNames]);
 
   useEffect(() => {
-    setLines([]); setConnected(false); setSearch("");
+    setLines([]);
+    setConnected(false);
+    setSearch("");
     if (serviceNames.length === 0) return;
 
     let alive = true;
@@ -86,7 +128,10 @@ export function MonitorPanel(props: {
       for (const name of serviceNames) {
         try {
           const sub = await api.subscribeLogs(name, 50);
-          if (!alive) { void api.unsubscribeLogs(sub.subId).catch(() => {}); continue; }
+          if (!alive) {
+            void api.unsubscribeLogs(sub.subId).catch(() => {});
+            continue;
+          }
           subIds.push(sub.subId);
           subIdToService.set(sub.subId, name);
         } catch {}
@@ -113,8 +158,17 @@ export function MonitorPanel(props: {
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") { e.preventDefault(); setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 50); }
-      if (e.key === "Escape") { setShowSearch(false); setSearch(""); setMarkA(null); setMarkB(null); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchRef.current?.focus(), 50);
+      }
+      if (e.key === "Escape") {
+        setShowSearch(false);
+        setSearch("");
+        setMarkA(null);
+        setMarkB(null);
+      }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -130,24 +184,41 @@ export function MonitorPanel(props: {
   }, [showLegend]);
 
   const toast = props.onToast;
-  function flash() { setCopied(true); setTimeout(() => setCopied(false), 1500); }
+  function flash() {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   async function copyAll() {
-    if (lines.length === 0) { toast?.("info", "Nenhum log para copiar"); return; }
+    if (lines.length === 0) {
+      toast?.("info", "Nenhum log para copiar");
+      return;
+    }
     const text = lines.map((l) => `[${l.service}] ${l.line}`).join("\n");
-    try { await navigator.clipboard.writeText(text); flash(); toast?.("success", `${lines.length} linhas copiadas`); } catch {}
+    try {
+      await navigator.clipboard.writeText(text);
+      flash();
+      toast?.("success", `${lines.length} linhas copiadas`);
+    } catch {}
   }
 
   function clearLogs() {
     setLines([]);
-    setMarkA(null); setMarkB(null);
+    setMarkA(null);
+    setMarkB(null);
     toast?.("info", "Logs limpos");
   }
 
   function handleLineClick(idx: number) {
-    if (markA === null) { setMarkA(idx); setMarkB(null); }
-    else if (markB === null) { setMarkB(idx); }
-    else { setMarkA(idx); setMarkB(null); }
+    if (markA === null) {
+      setMarkA(idx);
+      setMarkB(null);
+    } else if (markB === null) {
+      setMarkB(idx);
+    } else {
+      setMarkA(idx);
+      setMarkB(null);
+    }
   }
 
   async function copyRange() {
@@ -155,9 +226,17 @@ export function MonitorPanel(props: {
     const lo = Math.min(markA, markB);
     const hi = Math.max(markA, markB);
     const count = hi - lo + 1;
-    const text = lines.slice(lo, hi + 1).map((l) => `[${l.service}] ${l.line}`).join("\n");
-    try { await navigator.clipboard.writeText(text); flash(); toast?.("success", `${count} linhas copiadas`); } catch {}
-    setMarkA(null); setMarkB(null);
+    const text = lines
+      .slice(lo, hi + 1)
+      .map((l) => `[${l.service}] ${l.line}`)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      flash();
+      toast?.("success", `${count} linhas copiadas`);
+    } catch {}
+    setMarkA(null);
+    setMarkB(null);
   }
 
   const rangeMin = markA !== null && markB !== null ? Math.min(markA, markB) : null;
@@ -183,14 +262,18 @@ export function MonitorPanel(props: {
           <div className="flex items-center gap-0.5 shrink-0">
             <div className="relative">
               <Tooltip text="Legendas">
-                <button className={`btn btn-ghost px-2 py-1 ${showLegend ? "bg-accent/15 text-accent" : ""}`}
-                  onClick={() => setShowLegend(!showLegend)}>
+                <button
+                  className={`btn btn-ghost px-2 py-1 ${showLegend ? "bg-accent/15 text-accent" : ""}`}
+                  onClick={() => setShowLegend(!showLegend)}
+                >
                   <Icon.Palette className="h-3.5 w-3.5" />
                 </button>
               </Tooltip>
               {showLegend && (
-                <div ref={legendRef}
-                  className="absolute right-0 top-full mt-1 z-[300] w-56 rounded-lg border border-white/[0.08] bg-surface-2 shadow-elevated backdrop-blur-xl animate-scale-in">
+                <div
+                  ref={legendRef}
+                  className="absolute right-0 top-full mt-1 z-[300] w-56 rounded-lg border border-white/[0.08] bg-surface-2 shadow-elevated backdrop-blur-xl animate-scale-in"
+                >
                   <div className="px-3 py-2 border-b border-white/[0.06]">
                     <span className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Legendas</span>
                   </div>
@@ -206,13 +289,21 @@ export function MonitorPanel(props: {
               )}
             </div>
             <Tooltip text="Buscar (⌘F)">
-              <button className={`btn btn-ghost px-2 py-1 ${showSearch ? "bg-accent/15 text-accent" : ""}`}
-                onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchRef.current?.focus(), 50); }}>
+              <button
+                className={`btn btn-ghost px-2 py-1 ${showSearch ? "bg-accent/15 text-accent" : ""}`}
+                onClick={() => {
+                  setShowSearch(!showSearch);
+                  if (!showSearch) setTimeout(() => searchRef.current?.focus(), 50);
+                }}
+              >
                 <Icon.Search className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
             <Tooltip text="Copiar tudo">
-              <button className={`btn btn-ghost px-2 py-1 ${copied ? "bg-accent/15 text-accent" : ""}`} onClick={() => void copyAll()}>
+              <button
+                className={`btn btn-ghost px-2 py-1 ${copied ? "bg-accent/15 text-accent" : ""}`}
+                onClick={() => void copyAll()}
+              >
                 <Icon.Copy className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
@@ -228,27 +319,46 @@ export function MonitorPanel(props: {
           <div className="flex items-center gap-2 animate-slide-up">
             <div className="relative flex-1">
               <Icon.Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-600" />
-              <input ref={searchRef} type="text" placeholder="Buscar nos logs..." value={search}
-                onChange={(e) => setSearch(e.target.value)} className="input pl-7 text-xs"
-                onKeyDown={(e) => { if (e.key === "Escape") { setShowSearch(false); setSearch(""); } }} />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Buscar nos logs..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="input pl-7 text-xs"
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowSearch(false);
+                    setSearch("");
+                  }
+                }}
+              />
             </div>
             {search && <span className="text-2xs text-slate-500 tabular-nums shrink-0">{filtered.length}</span>}
           </div>
         )}
       </div>
       <div className="divider" />
-      <div ref={scrollRef} onScroll={handleScroll}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-auto bg-surface-0/50 px-4 py-3 font-mono leading-relaxed select-text cursor-text"
-        style={{ fontSize: `${logFontSize}px` }}>
+        style={{ fontSize: `${logFontSize}px` }}
+      >
         {filtered.map(({ service, line, i }) => {
           const color = colorMap.get(service) ?? "#64748b";
           const isMarked = markA === i || markB === i;
           const inRange = rangeMin !== null && rangeMax !== null && i >= rangeMin && i <= rangeMax;
           return (
-            <div key={i} onClick={() => handleLineClick(i)}
-              className={`flex items-start gap-0 py-px cursor-pointer transition-colors ${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} rounded px-1.5 -mx-1 ${isMarked ? "bg-accent/25 ring-1 ring-accent/50" : inRange ? "bg-accent/15" : "hover:bg-white/[0.04]"}`}>
-              <span className="shrink-0 inline-flex items-center rounded px-1.5 py-px text-[10px] font-bold leading-tight mr-2 mt-px"
-                style={{ backgroundColor: color, color: "#0f0f0f" }}>
+            <div
+              key={i}
+              onClick={() => handleLineClick(i)}
+              className={`flex items-start gap-0 py-px cursor-pointer transition-colors ${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"} rounded px-1.5 -mx-1 ${isMarked ? "bg-accent/25 ring-1 ring-accent/50" : inRange ? "bg-accent/15" : "hover:bg-white/[0.04]"}`}
+            >
+              <span
+                className="shrink-0 inline-flex items-center rounded px-1.5 py-px text-[10px] font-bold leading-tight mr-2 mt-px"
+                style={{ backgroundColor: color, color: "#0f0f0f" }}
+              >
                 {service}
               </span>
               <span className={getLineColor(line)}>{search ? highlight(line, search) : line}</span>
@@ -276,7 +386,14 @@ export function MonitorPanel(props: {
               <button className="btn btn-primary text-2xs px-2.5 py-1" onClick={() => void copyRange()}>
                 <Icon.Copy className="h-3 w-3" /> Copiar
               </button>
-              <button className="btn btn-ghost text-2xs px-1.5 py-1 text-slate-500" onClick={() => { setMarkA(null); setMarkB(null); toast?.("info", "Seleção cancelada"); }}>
+              <button
+                className="btn btn-ghost text-2xs px-1.5 py-1 text-slate-500"
+                onClick={() => {
+                  setMarkA(null);
+                  setMarkB(null);
+                  toast?.("info", "Seleção cancelada");
+                }}
+              >
                 <Icon.X className="h-3 w-3" />
               </button>
             </span>
@@ -284,8 +401,13 @@ export function MonitorPanel(props: {
         </div>
       )}
       {!autoScroll && lines.length > 0 && (
-        <button className="absolute bottom-6 right-6 btn btn-primary shadow-glow animate-slide-up select-none"
-          onClick={() => { setAutoScroll(true); bottomRef.current?.scrollIntoView({ block: "end" }); }}>
+        <button
+          className="absolute bottom-6 right-6 btn btn-primary shadow-glow animate-slide-up select-none"
+          onClick={() => {
+            setAutoScroll(true);
+            bottomRef.current?.scrollIntoView({ block: "end" });
+          }}
+        >
           <Icon.ArrowDown className="h-3 w-3" /> Final
         </button>
       )}
@@ -301,7 +423,11 @@ function highlight(line: string, search: string): ReactNode {
   let pos = lower.indexOf(sLower, last);
   while (pos !== -1) {
     if (pos > last) parts.push(line.slice(last, pos));
-    parts.push(<mark key={pos} className="bg-accent/30 text-accent rounded px-0.5">{line.slice(pos, pos + search.length)}</mark>);
+    parts.push(
+      <mark key={pos} className="bg-accent/30 text-accent rounded px-0.5">
+        {line.slice(pos, pos + search.length)}
+      </mark>,
+    );
     last = pos + search.length;
     pos = lower.indexOf(sLower, last);
   }

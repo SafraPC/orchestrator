@@ -58,7 +58,7 @@ orchestrator-desktop/src-tauri/target/release/bundle/
 
 | Variável | Uso |
 |----------|-----|
-| `SPRING_DEV_ORCHESTRATOR_CORE_JAR` | JAR customizado para dev (`npm run tauri:dev`) |
+| `ORCHESTRATOR_CORE_JAR` | JAR customizado para dev (`npm run tauri:dev`) |
 
 ## Troubleshooting
 

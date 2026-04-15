@@ -24,11 +24,11 @@ fn state_dir(app: &tauri::AppHandle) -> PathBuf {
     .path()
     .app_data_dir()
     .unwrap_or_else(|_| PathBuf::from(".orchestrator/appdata"));
-  base.join("spring-dev-orchestrator")
+  base.join("orchestrator")
 }
 
 fn core_jar_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  if let Ok(env_jar) = std::env::var("SPRING_DEV_ORCHESTRATOR_CORE_JAR") {
+  if let Ok(env_jar) = std::env::var("ORCHESTRATOR_CORE_JAR") {
     return Ok(PathBuf::from(env_jar));
   }
 

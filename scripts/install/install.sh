@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${REPO:-SafraPC/spring-dev-orchestrator}"
+REPO="${REPO:-SafraPC/orchestrator}"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 RELEASE_PAGE="https://github.com/${REPO}/releases/latest"
-TMP_DIR="${TMPDIR:-/tmp}/spring-dev-orchestrator-install"
+TMP_DIR="${TMPDIR:-/tmp}/orchestrator-install"
 mkdir -p "$TMP_DIR"
 
 require_cmd() {
@@ -29,7 +29,7 @@ esac
 echo "[install] Detectado: ${OS} ${ARCH}"
 echo "[install] Buscando último release em ${REPO}"
 
-curl_args=(-fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: spring-dev-orchestrator-installer")
+curl_args=(-fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: orchestrator-installer")
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 fi
@@ -171,7 +171,7 @@ PY
   cp -R "$app_path" "$target/"
   hdiutil detach "$mount_point" -quiet || true
   echo "[install] Concluído (macOS)."
-  echo "[install] Dados persistentes: ~/Library/Application Support/dev.safra.spring-dev-orchestrator/spring-dev-orchestrator/core"
+  echo "[install] Dados persistentes: ~/Library/Application Support/dev.safra.orchestrator/orchestrator/core"
 }
 
 install_linux() {
@@ -223,7 +223,7 @@ EOF
     echo "[install] Formato Linux não suportado: $file"
     exit 1
   fi
-  echo "[install] Dados persistentes: ~/.local/share/dev.safra.spring-dev-orchestrator/spring-dev-orchestrator/core"
+  echo "[install] Dados persistentes: ~/.local/share/dev.safra.orchestrator/orchestrator/core"
 }
 
 case "$OS" in

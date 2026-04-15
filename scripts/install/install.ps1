@@ -1,14 +1,14 @@
 $ErrorActionPreference = "Stop"
 
-$Repo = if ($env:REPO) { $env:REPO } else { "SafraPC/spring-dev-orchestrator" }
+$Repo = if ($env:REPO) { $env:REPO } else { "SafraPC/orchestrator" }
 $ApiUrl = "https://api.github.com/repos/$Repo/releases/latest"
 $ReleasePage = "https://github.com/$Repo/releases/latest"
-$TempDir = Join-Path $env:TEMP "spring-dev-orchestrator-install"
+$TempDir = Join-Path $env:TEMP "orchestrator-install"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 
 $Headers = @{
   "Accept" = "application/vnd.github+json"
-  "User-Agent" = "spring-dev-orchestrator-installer"
+  "User-Agent" = "orchestrator-installer"
 }
 if ($env:GITHUB_TOKEN) {
   $Headers["Authorization"] = "Bearer $($env:GITHUB_TOKEN)"
@@ -73,4 +73,4 @@ if ($DownloadPath.ToLowerInvariant().EndsWith(".msi")) {
 }
 
 Write-Host "[install] Instalação concluída."
-Write-Host "[install] Dados persistentes: $env:APPDATA\\dev.safra.spring-dev-orchestrator\\spring-dev-orchestrator\\core"
+Write-Host "[install] Dados persistentes: $env:APPDATA\\dev.safra.orchestrator\\orchestrator\\core"

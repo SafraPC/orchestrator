@@ -1,7 +1,7 @@
-# Spring Dev Orchestrator — Cursor Rules
+# Orchestrator — Cursor Rules
 
 ## Overview
-Desktop app (Tauri) that orchestrates multiple Spring Boot microservices.
+Desktop app (Tauri) that orchestrates local Spring Boot and JavaScript projects.
 Two modules: `orchestrator-core` (Java 17) and `orchestrator-desktop` (Tauri + React).
 The old `orchestrator-ui/` module is DEPRECATED — all frontend lives in `orchestrator-desktop/src/`.
 

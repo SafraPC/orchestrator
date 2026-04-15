@@ -1,22 +1,22 @@
-# Spring Dev Orchestrator
+# Orchestrator
 
-<p align="center">Desktop orchestration for local Spring Boot services and companion JavaScript apps.</p>
+<p align="center">Desktop orchestration for local Spring and JavaScript projects, including React, Next.js, NestJS, and Vue.</p>
 
 <p align="center">
-  <a href="https://github.com/SafraPC/spring-dev-orchestrator/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/SafraPC/spring-dev-orchestrator?display_name=release">
+  <a href="https://github.com/SafraPC/orchestrator/releases/latest">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/SafraPC/orchestrator?display_name=release">
   </a>
-  <a href="https://github.com/SafraPC/spring-dev-orchestrator/releases/latest">
-    <img alt="Total downloads" src="https://img.shields.io/github/downloads/SafraPC/spring-dev-orchestrator/total">
+  <a href="https://github.com/SafraPC/orchestrator/releases/latest">
+    <img alt="Total downloads" src="https://img.shields.io/github/downloads/SafraPC/orchestrator/total">
   </a>
   <a href="./LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/SafraPC/spring-dev-orchestrator">
+    <img alt="License" src="https://img.shields.io/github/license/SafraPC/orchestrator">
   </a>
   <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-1f6feb">
 </p>
 
 <p align="center">
-  <a href="https://github.com/SafraPC/spring-dev-orchestrator/releases/latest">
+  <a href="https://github.com/SafraPC/orchestrator/releases/latest">
     <img alt="Download for macOS, Windows, and Linux" src="https://img.shields.io/badge/Download-macOS%20%7C%20Windows%20%7C%20Linux-2ea44f?style=for-the-badge">
   </a>
 </p>
@@ -29,7 +29,7 @@ No Docker required.
 
 Prebuilt installers are published with every release.
 
-**Download for macOS, Windows, and Linux:** [Latest release](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
+**Download for macOS, Windows, and Linux:** [Latest release](https://github.com/SafraPC/orchestrator/releases/latest)
 
 | Platform | Recommended package | Fallbacks |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ Orchestrator has two different requirement sets: one for using the released app,
 | Scenario | Required | Optional |
 | --- | --- | --- |
 | Use the released desktop app | Java 17+ in `PATH` | `JAVA_HOME` configured |
-| Run Spring Boot services | JDK compatible with each service | Maven or `mvnw` |
+| Run Spring services | JDK compatible with each service | Maven or `mvnw` |
 | Run Next.js, NestJS, React, or Vue services | Node.js compatible with each project | `nvm`, `fnm`, or Volta |
 | Develop this repository | Java 17+, Maven, Node.js 18+, Rust stable | OS-specific Tauri dependencies |
 
@@ -56,7 +56,7 @@ Orchestrator has two different requirement sets: one for using the released app,
 - End users do not need Maven or Node.js unless imported services depend on them.
 - The desktop app launches the bundled core with the system `java` command.
 - If `java` is not available in `PATH`, the app will not start.
-- `JAVA_HOME` is the recommended default JDK for Spring Boot services.
+- `JAVA_HOME` is the recommended default JDK for Spring services.
 - Windows installers handle `WebView2` automatically on supported systems.
 - On Linux, prefer `.deb` or `.rpm` because Tauri relies on system `WebKitGTK` libraries.
 
@@ -67,7 +67,7 @@ Orchestrator has two different requirement sets: one for using the released app,
 Use Java 17 or newer.
 Prefer a JDK, not only a JRE.
 App startup requires `java` in `PATH`.
-Spring Boot services use `JAVA_HOME` by default.
+Spring services use `JAVA_HOME` by default.
 When multiple JDKs are detected, the app can switch versions per service.
 
 Verify:
@@ -154,7 +154,7 @@ Prefer distro packages over `.AppImage` when possible.
 
 ## Supported Project Types
 
-The orchestrator is centered on Spring Boot workflows, with support for common JavaScript companion apps discovered through `package.json`.
+The orchestrator supports Spring services and common JavaScript projects discovered through `pom.xml` and `package.json`.
 
 | Project type | Detection strategy |
 | --- | --- |
@@ -277,9 +277,9 @@ The application stores its state in the operating system data directory.
 
 | Platform | Path |
 | --- | --- |
-| macOS | `~/Library/Application Support/dev.safra.spring-dev-orchestrator/spring-dev-orchestrator/core` |
-| Linux | `~/.local/share/dev.safra.spring-dev-orchestrator/spring-dev-orchestrator/core` |
-| Windows | `%APPDATA%\dev.safra.spring-dev-orchestrator\spring-dev-orchestrator\core` |
+| macOS | `~/Library/Application Support/dev.safra.orchestrator/orchestrator/core` |
+| Linux | `~/.local/share/dev.safra.orchestrator/orchestrator/core` |
+| Windows | `%APPDATA%\dev.safra.orchestrator\orchestrator\core` |
 
 ## License
 

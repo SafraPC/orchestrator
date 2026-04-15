@@ -117,5 +117,5 @@ log "Abrindo Desktop (Tauri dev)..."
     log "Instalando dependências do Desktop (npm install)..."
     npm install
   fi
-  SPRING_DEV_ORCHESTRATOR_CORE_JAR="$ROOT_DIR/orchestrator-core/target/orchestrator-core-standalone.jar" npm run tauri:dev
+  ORCHESTRATOR_CORE_JAR="$ROOT_DIR/orchestrator-core/target/orchestrator-core-standalone.jar" npm run tauri:dev
 )

@@ -27,7 +27,7 @@ jobs:
             artifact_glob: |
               orchestrator-desktop/src-tauri/target/release/bundle/deb/*.deb
               orchestrator-desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-          - os: macos-latest
+          - os: macos-13
             artifact_name: mac-installers
             tauri_bundles: "dmg"
             artifact_glob: |
@@ -90,7 +90,17 @@ jobs:
         working-directory: orchestrator-desktop
 
       - name: Build Tauri bundles
-        run: npm run tauri:build -- --bundles ${{ matrix.tauri_bundles }}
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            npm run tauri:build -- --bundles ${{ matrix.tauri_bundles }} || {
+              echo "Primeira tentativa falhou no macOS. Nova tentativa..."
+              sleep 5
+              npm run tauri:build -- --bundles ${{ matrix.tauri_bundles }}
+            }
+          else
+            npm run tauri:build -- --bundles ${{ matrix.tauri_bundles }}
+          fi
         working-directory: orchestrator-desktop
 
       - name: Upload artifacts

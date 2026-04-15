@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.process.JavaVersionDetector;
 import dev.safra.orchestrator.process.ProcessManager;
@@ -91,14 +92,16 @@ public class CoreRuntime {
       case "reorderServices" -> {
         List<String> order = new ArrayList<>();
         if (params != null && params.has("order") && params.get("order").isArray()) {
-          for (JsonNode n : params.get("order")) order.add(n.asText());
+          for (JsonNode n : params.get("order"))
+            order.add(n.asText());
         }
         yield workspaceManager.reorderServices(order);
       }
       case "reorderContainers" -> {
         List<String> order = new ArrayList<>();
         if (params != null && params.has("order") && params.get("order").isArray()) {
-          for (JsonNode n : params.get("order")) order.add(n.asText());
+          for (JsonNode n : params.get("order"))
+            order.add(n.asText());
         }
         yield workspaceManager.reorderContainers(order);
       }
@@ -164,6 +167,19 @@ public class CoreRuntime {
       case "listJdks" -> {
         List<JavaVersionDetector.JdkInfo> jdks = processManager.getJavaDetector().detectAll();
         yield om.valueToTree(jdks);
+      }
+      case "setServiceScript" -> {
+        String name = reqName(params);
+        String script = params != null && params.hasNonNull("script") ? params.get("script").asText() : null;
+        ServiceDescriptor sd = serviceManager.requireService(name);
+        ServiceDefinition def = sd.getDefinition();
+        if (script != null && def.getAvailableScripts() != null && def.getAvailableScripts().contains(script)) {
+          def.setSelectedScript(script);
+          def.setCommand(List.of("npm", "run", script));
+        }
+        workspaceManager.persistWorkspace();
+        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
+        yield serviceManager.list();
       }
       case "setServiceJavaVersion" -> {
         String name = reqName(params);

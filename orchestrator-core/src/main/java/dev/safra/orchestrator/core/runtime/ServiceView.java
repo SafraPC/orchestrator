@@ -18,6 +18,7 @@ public record ServiceView(
         List<String> containerIds,
         ProjectType projectType,
         List<String> availableScripts,
+        String selectedScript,
         Long pid,
         ServiceStatus status,
         Instant lastStartAt,

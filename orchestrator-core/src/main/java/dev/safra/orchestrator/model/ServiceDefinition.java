@@ -17,4 +17,5 @@ public class ServiceDefinition {
   private List<String> containerIds;
   private ProjectType projectType;
   private List<String> availableScripts;
+  private String selectedScript;
 }

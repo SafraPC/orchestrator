@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { ServiceDto } from "../api/types";
@@ -250,7 +251,7 @@ export function MonitorPanel(props: {
                 style={{ backgroundColor: color, color: "#0f0f0f" }}>
                 {service}
               </span>
-              <span className={getLineColor(line)}>{line}</span>
+              <span className={getLineColor(line)}>{search ? highlight(line, search) : line}</span>
             </div>
           );
         })}
@@ -290,6 +291,22 @@ export function MonitorPanel(props: {
       )}
     </div>
   );
+}
+
+function highlight(line: string, search: string): ReactNode {
+  const parts: ReactNode[] = [];
+  const lower = line.toLowerCase();
+  const sLower = search.toLowerCase();
+  let last = 0;
+  let pos = lower.indexOf(sLower, last);
+  while (pos !== -1) {
+    if (pos > last) parts.push(line.slice(last, pos));
+    parts.push(<mark key={pos} className="bg-accent/30 text-accent rounded px-0.5">{line.slice(pos, pos + search.length)}</mark>);
+    last = pos + search.length;
+    pos = lower.indexOf(sLower, last);
+  }
+  if (last < line.length) parts.push(line.slice(last));
+  return <>{parts}</>;
 }
 
 function getLineColor(line: string): string {

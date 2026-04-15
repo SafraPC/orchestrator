@@ -20,9 +20,13 @@ export function ContextMenu(props: {
   onClose: () => void;
   onDelete: () => void;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
+  onSetScript: (name: string, script: string) => Promise<void>;
 }) {
   const { s } = props;
   const uniqueVersions = [...new Set(props.jdks.map((j) => j.majorVersion))];
+  const isJs = s.projectType && s.projectType !== "SPRING_BOOT";
+  const scripts = s.availableScripts ?? [];
+  const activeScript = s.selectedScript ?? (s.command?.[2] || null);
   const [openSub, setOpenSub] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -96,6 +100,25 @@ export function ContextMenu(props: {
                   <span className="text-2xs">Padrão (JAVA_HOME)</span>
                   {!s.javaVersion && <Icon.Check className="h-3 w-3 shrink-0" />}
                 </button>
+              </SubMenu>
+            </>
+          )}
+
+          {isJs && scripts.length > 1 && (
+            <>
+              <div className="divider my-1" />
+              <SubMenu label="npm script" icon="Terminal" isOpen={openSub === "script"}
+                menuRef={menuRef} onEnter={() => cancelClose("script")} onLeave={scheduleClose}>
+                {scripts.map((sc) => {
+                  const isActive = activeScript === sc;
+                  return (
+                    <button key={sc} className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors ${isActive ? "bg-accent/10 text-accent" : "text-slate-400 hover:bg-surface-3 hover:text-slate-200"}`}
+                      onClick={() => void props.onSetScript(s.name, sc)}>
+                      <span className="font-mono text-2xs">{sc}</span>
+                      {isActive && <Icon.Check className="h-3 w-3 shrink-0" />}
+                    </button>
+                  );
+                })}
               </SubMenu>
             </>
           )}

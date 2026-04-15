@@ -236,7 +236,7 @@ public class ServiceManager {
     return new ServiceView(
         def.getName(), def.getPath(), def.getCommand(), def.getLogFile(),
         def.getEnv(), def.getJavaHome(), def.getJavaVersion(), def.getContainerIds(),
-        def.getProjectType(), def.getAvailableScripts(),
+        def.getProjectType(), def.getAvailableScripts(), def.getSelectedScript(),
         rt.getPid(), rt.getStatus(), rt.getLastStartAt(), rt.getLastStopAt(), rt.getLastError());
   }
 

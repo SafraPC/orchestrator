@@ -13,6 +13,7 @@ export type ServiceDto = {
   containerIds?: string[];
   projectType?: ProjectType;
   availableScripts?: string[];
+  selectedScript?: string | null;
   pid?: number | null;
   status: ServiceStatus;
   lastStartAt?: string | null;

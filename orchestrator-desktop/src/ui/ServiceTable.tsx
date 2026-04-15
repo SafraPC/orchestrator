@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
 import { ContextMenu } from "./ContextMenu";
@@ -143,6 +144,7 @@ export function ServiceTable(props: {
           onAdd={addTo}
           onRemove={(svc, cid) => { const c = containers.find((ct) => ct.id === cid); setMenuOpen(null); setRmContTarget({ svc, cid, cname: c?.name ?? "" }); }}
           onSetJava={async (name, ver) => { setMenuOpen(null); try { const u = await api.setServiceJavaVersion(name, ver); props.onServicesUpdate?.(u); props.onToast?.("success", `Java ${ver ?? "padrão"} → ${name}`); } catch (e) { props.onToast?.("error", String(e)); } }}
+          onSetScript={async (name, script) => { setMenuOpen(null); try { const u = await api.setServiceScript(name, script); props.onServicesUpdate?.(u); props.onToast?.("success", `npm run ${script} → ${name}`); } catch (e) { props.onToast?.("error", String(e)); } }}
           onStart={async () => { setBusy(s.name); try { await api.start(s.name); await props.onAction(); } finally { setBusy(null); } }}
           onStop={async () => { setBusy(s.name); try { await api.stop(s.name); await props.onAction(); } finally { setBusy(null); } }}
           onRestart={async () => { setBusy(s.name); try { await api.restart(s.name); await props.onAction(); } finally { setBusy(null); } }}
@@ -171,6 +173,7 @@ function ServiceRow(props: {
   onDelete: () => void; onAdd: (s: string, c: string) => Promise<void>;
   onRemove: (s: string, c: string) => void;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
+  onSetScript: (name: string, script: string) => Promise<void>;
   onStart: () => Promise<void>; onStop: () => Promise<void>; onRestart: () => Promise<void>;
 }) {
   const { s, sel, containers } = props;
@@ -185,6 +188,7 @@ function ServiceRow(props: {
       data-drag-item
       className={`group relative rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-200 ${sel ? "border-accent/25 bg-accent/[0.06] shadow-glow" : "border-white/[0.06] bg-surface-1 hover:border-white/[0.10] hover:bg-surface-2"} ${props.isDragging ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30 bg-accent/[0.06]" : ""}`}
       onClick={props.onSelect}
+      onContextMenu={(e) => { e.preventDefault(); props.onSelect(); props.onMenuToggle(); }}
     >
       <div className="flex items-center gap-2 min-w-0">
         <span
@@ -216,7 +220,7 @@ function ServiceRow(props: {
             {props.menuOpen && (
               <ContextMenu s={s} port={port} containers={containers} jdks={props.jdks}
                 onAdd={props.onAdd} onRemove={props.onRemove} onClose={props.onMenuClose}
-                onDelete={props.onDelete} onSetJava={props.onSetJava} />
+                onDelete={props.onDelete} onSetJava={props.onSetJava} onSetScript={props.onSetScript} />
             )}
           </div>
         </div>
@@ -224,7 +228,7 @@ function ServiceRow(props: {
       {(port || ut || s.pid || (s.containerIds && s.containerIds.length > 0)) && (
         <div className="mt-1.5 ml-4 flex items-center gap-2 flex-wrap">
           {port && <span className="text-2xs text-accent/70 font-mono cursor-pointer hover:text-accent transition-colors"
-            onClick={(e) => { e.stopPropagation(); window.open(`http://localhost:${port}`, "_blank"); }}>PORT:{port}</span>}
+            onClick={(e) => { e.stopPropagation(); void openUrl(`http://localhost:${port}`).catch(() => {}); }}>PORT:{port}</span>}
           {port && s.pid && <span className="text-2xs text-slate-600 select-none">|</span>}
           {s.pid && <span className="text-2xs text-slate-500 font-mono">PID {s.pid}</span>}
           {ut && <span className="text-2xs text-accent/40 font-mono tabular-nums">{ut}</span>}

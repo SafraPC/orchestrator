@@ -224,7 +224,7 @@ public class WorkspaceManager {
     var r = sd.getRuntime();
     return new ServiceView(d.getName(), d.getPath(), d.getCommand(), d.getLogFile(),
         d.getEnv(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
-        d.getProjectType(), d.getAvailableScripts(),
+        d.getProjectType(), d.getAvailableScripts(), d.getSelectedScript(),
         r.getPid(), r.getStatus(), r.getLastStartAt(), r.getLastStopAt(), r.getLastError());
   }
 

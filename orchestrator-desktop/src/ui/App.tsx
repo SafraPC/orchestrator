@@ -65,6 +65,12 @@ export function App() {
   }, [refresh]);
 
   useEffect(() => {
+    const block = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
+  }, []);
+
+  useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); setSettingsOpen((v) => !v); return; }
       if (!selected) return;
@@ -108,6 +114,16 @@ export function App() {
     selectedContainer ? services.filter((s) => s.containerIds?.includes(selectedContainer)) : [],
     [services, selectedContainer]);
 
+  const handleSelectContainer = useCallback(async (id: string | null) => {
+    setSelectedContainer(id);
+    if (id) {
+      const svcInContainer = services.filter((s) => s.containerIds?.includes(id));
+      if (svcInContainer.length < 2 && svcInContainer.length > 0) setSelected(svcInContainer[0].name);
+    }
+    setFilterText("");
+    await refresh();
+  }, [services, refresh]);
+
   const filteredServices = useMemo(() => {
     let f = selectedContainer ? containerServices : services;
     if (techFilter) f = f.filter((s) => (s.projectType ?? "SPRING_BOOT") === techFilter);
@@ -129,14 +145,14 @@ export function App() {
             </Tooltip>
           </div>
           <div className={`transition-opacity duration-200 ${containersCollapsed ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100 h-[calc(100%-37px)]"}`}>
-            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={async (id) => { setSelectedContainer(id); await refresh(); }} onRefresh={refresh} onContainersChanged={refresh} onContainersReorder={setContainers} onToast={addToast} />
+            <ContainersPanel services={services} containers={containers} selectedContainer={selectedContainer} onSelectContainer={handleSelectContainer} onRefresh={refresh} onContainersChanged={refresh} onContainersReorder={setContainers} onToast={addToast} />
           </div>
         </aside>
         {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={140} max={320} />}
 
         <section className="flex flex-col shrink-0 border-r border-white/[0.04]" style={{ width: svcW }}>
           <div className="px-3 py-2.5 border-b border-white/[0.04] space-y-2">
-            <ContainerTabs containers={containers} selectedContainer={selectedContainer} onSelect={async (id) => { setSelectedContainer(id); setFilterText(""); await refresh(); }} />
+            <ContainerTabs containers={containers} selectedContainer={selectedContainer} onSelect={handleSelectContainer} />
             <ImportSection onImported={refresh} addToast={addToast} />
             <div className="flex items-center gap-1.5">
               <div className="relative flex-1 min-w-0">

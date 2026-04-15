@@ -39,6 +39,8 @@ public class ProcessManager {
       }
 
       List<String> cmd = new ArrayList<>(def.getCommand());
+      boolean isJava = def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT;
+
       if (!cmd.isEmpty() && "./mvnw".equals(cmd.get(0))) {
         try {
           java.io.File mvnw = workDir.resolve("mvnw").toFile();
@@ -48,6 +50,14 @@ public class ProcessManager {
         } catch (Exception ignored) {
         }
       }
+
+      if (!isJava) {
+        String shell = System.getenv("SHELL");
+        if (shell == null || shell.isBlank()) shell = "/bin/zsh";
+        String joined = String.join(" ", cmd);
+        cmd = List.of(shell, "-lc", joined);
+      }
+
       ProcessBuilder pb = new ProcessBuilder(cmd);
       pb.directory(workDir.toFile());
       pb.redirectErrorStream(true);
@@ -56,13 +66,12 @@ public class ProcessManager {
       Map<String, String> env = pb.environment();
       if (def.getEnv() != null) env.putAll(def.getEnv());
 
-      boolean isJava = def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT;
       String path = env.getOrDefault("PATH", "");
 
       if (isJava) {
         path = setupJavaPath(def, env, path);
       } else {
-        path = setupNodePath(env, path);
+        path = setupNodePath(env, path, workDir);
       }
 
       for (String extra : new String[]{"/opt/homebrew/bin", "/usr/local/bin"}) {
@@ -159,7 +168,13 @@ public class ProcessManager {
     return path;
   }
 
-  private String setupNodePath(Map<String, String> env, String path) {
+  private String setupNodePath(Map<String, String> env, String path, Path workDir) {
+    String localBin = workDir.resolve("node_modules/.bin").toAbsolutePath().toString();
+    path = localBin + ":" + path;
+
+    String shellPath = resolveShellPath();
+    if (!shellPath.isEmpty()) path = shellPath + ":" + path;
+
     String home = System.getProperty("user.home");
     String[] nodePaths = {
         home + "/.nvm/versions/node",
@@ -172,13 +187,30 @@ public class ProcessManager {
       if (dir.endsWith("/node")) {
         try (var stream = Files.list(p)) {
           var latest = stream.filter(Files::isDirectory).max(java.util.Comparator.naturalOrder());
-          if (latest.isPresent()) path = latest.get().resolve("bin") + ":" + path;
+          if (latest.isPresent()) {
+            String bin = latest.get().resolve("bin").toString();
+            if (!path.contains(bin)) path = bin + ":" + path;
+          }
         } catch (Exception ignored) {}
       } else {
-        path = dir + ":" + path;
+        if (!path.contains(dir)) path = dir + ":" + path;
       }
     }
     return path;
+  }
+
+  private String resolveShellPath() {
+    try {
+      String shell = System.getenv("SHELL");
+      if (shell == null || shell.isBlank()) shell = "/bin/zsh";
+      Process p = new ProcessBuilder(shell, "-lc", "echo $PATH")
+          .redirectErrorStream(true).start();
+      String out = new String(p.getInputStream().readAllBytes()).trim();
+      p.waitFor(5, TimeUnit.SECONDS);
+      return out;
+    } catch (Exception ignored) {
+      return "";
+    }
   }
 
   private void freePort(ServiceDefinition def) {

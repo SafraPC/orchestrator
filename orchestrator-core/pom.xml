@@ -14,6 +14,9 @@
     <java.version>17</java.version>
     <jackson.version>2.15.4</jackson.version>
     <lombok.version>1.18.32</lombok.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
   </properties>
 
   <dependencies>
@@ -65,6 +68,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
+          <encoding>${maven.compiler.encoding}</encoding>
           <source>${java.version}</source>
           <target>${java.version}</target>
           <compilerArgs>

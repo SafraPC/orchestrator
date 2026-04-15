@@ -85,6 +85,10 @@ jobs:
         run: npm ci
         working-directory: orchestrator-desktop
 
+      - name: Build desktop frontend assets
+        run: npm run build
+        working-directory: orchestrator-desktop
+
       - name: Build Tauri bundles
         run: npm run tauri:build -- --bundles ${{ matrix.tauri_bundles }}
         working-directory: orchestrator-desktop

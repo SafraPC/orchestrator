@@ -80,31 +80,22 @@ Fluxo:
 
 Sem clonar projeto.
 Sem build manual local.
-Use links diretos.
+Use download direto na release.
 
-### Instalação automática por sistema
+### Download por sistema
 
 Pré-condição:
 - existe release publicada com assets nativos
-- para repositório privado, exporte `GITHUB_TOKEN`
 
 **macOS (Intel/Apple Silicon)**
 
-- Release: [baixar instalador macOS](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
-- Comando 1 linha:
-
-```bash
-curl -fsSL https://github.com/SafraPC/spring-dev-orchestrator/releases/latest/download/install.sh | bash
-```
+- [Baixar no GitHub Releases](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
+- Arquivo esperado: `.dmg`
 
 **Linux Ubuntu / Debian**
 
-- Release: [baixar instalador Linux](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
-- Comando 1 linha:
-
-```bash
-curl -fsSL https://github.com/SafraPC/spring-dev-orchestrator/releases/latest/download/install.sh | bash
-```
+- [Baixar no GitHub Releases](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
+- Arquivo esperado: `.deb` ou `.AppImage`
 
 Prioridade de pacote no Ubuntu/Debian:
 - `.deb` (preferencial)
@@ -112,12 +103,8 @@ Prioridade de pacote no Ubuntu/Debian:
 
 **Linux Arch**
 
-- Release: [baixar instalador Arch](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
-- Comando 1 linha:
-
-```bash
-curl -fsSL https://github.com/SafraPC/spring-dev-orchestrator/releases/latest/download/install.sh | bash
-```
+- [Baixar no GitHub Releases](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
+- Arquivo esperado: `.AppImage` ou `.pkg.tar.zst`
 
 Prioridade de pacote no Arch:
 - `.AppImage` (preferencial)
@@ -125,12 +112,8 @@ Prioridade de pacote no Arch:
 
 **Windows**
 
-- Release: [baixar instalador Windows](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
-- Comando PowerShell:
-
-```powershell
-irm https://github.com/SafraPC/spring-dev-orchestrator/releases/latest/download/install.ps1 | iex
-```
+- [Baixar no GitHub Releases](https://github.com/SafraPC/spring-dev-orchestrator/releases/latest)
+- Arquivo esperado: `.msi` ou `.exe`
 
 Prioridade de pacote no Windows:
 - `.msi` (preferencial)

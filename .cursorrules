@@ -117,6 +117,8 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 ## Build
 - `./build.sh` — full build: core JAR → copy to Tauri → frontend build → Tauri build
 - `./start.sh` — dev mode: core JAR → Vite dev → Tauri dev
+- `scripts/install/install.sh` — install automático para macOS/Linux via release latest
+- `scripts/install/install.ps1` — install automático para Windows via release latest
 - Output: `.app`/`.dmg` in `orchestrator-desktop/src-tauri/target/release/bundle/`
 
 ## Tech Stack

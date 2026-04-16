@@ -27,7 +27,6 @@ public class WorkspaceManager {
   private final Path runtimeFile;
   private final ObjectMapper om;
   private final StateStore store;
-  private final PortExtractor portExtractor;
   private final ProjectScanner scanner;
   private final JsProjectScanner jsScanner;
   private final BiConsumer<String, JsonNode> emitEvent;
@@ -41,7 +40,6 @@ public class WorkspaceManager {
     this.stateDir = stateDir;
     this.om = om;
     this.store = store;
-    this.portExtractor = portExtractor;
     this.emitEvent = emitEvent;
     this.services = services;
     this.workspaceFile = stateDir.resolve("workspace.json");
@@ -206,6 +204,27 @@ public class WorkspaceManager {
     return buildSortedServiceList();
   }
 
+  public void refreshDynamicJsMetadata() {
+    boolean changed = false;
+    for (ServiceDescriptor descriptor : services.values()) changed |= refreshDynamicJsMetadata(descriptor.getDefinition());
+    if (changed) persistWorkspace();
+  }
+
+  public boolean refreshDynamicJsMetadata(ServiceDefinition def) {
+    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) return false;
+    List<String> beforeScripts = def.getAvailableScripts() == null ? List.of() : new ArrayList<>(def.getAvailableScripts());
+    Integer beforePort = def.getDetectedPort();
+    String beforeStrategy = def.getPortStrategy();
+    String beforeSelected = def.getSelectedScript();
+    List<String> beforeCommand = def.getCommand() == null ? List.of() : new ArrayList<>(def.getCommand());
+    jsScanner.refreshServiceDefinition(def);
+    return !beforeScripts.equals(def.getAvailableScripts() == null ? List.of() : def.getAvailableScripts())
+        || !java.util.Objects.equals(beforePort, def.getDetectedPort())
+        || !java.util.Objects.equals(beforeStrategy, def.getPortStrategy())
+        || !java.util.Objects.equals(beforeSelected, def.getSelectedScript())
+        || !beforeCommand.equals(def.getCommand() == null ? List.of() : def.getCommand());
+  }
+
   private JsonNode buildSortedServiceList() {
     return om.valueToTree(sortedViews(services.values().stream()
         .map(this::toView).toList()));
@@ -215,7 +234,7 @@ public class WorkspaceManager {
     var d = sd.getDefinition();
     var r = sd.getRuntime();
     return new ServiceView(d.getName(), d.getPath(), d.getCommand(), d.getLogFile(),
-        d.getEnv(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
+        d.getEnv(), d.getDetectedPort(), d.getCustomPort(), d.getPortStrategy(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
         d.getProjectType(), d.getAvailableScripts(), d.getSelectedScript(),
         r.getPid(), r.getStatus(), r.getLastStartAt(), r.getLastStopAt(), r.getLastError());
   }

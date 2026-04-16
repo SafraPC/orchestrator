@@ -17,6 +17,21 @@ export const Icon = {
       <path d="M4.2 9.5A4.5 4.5 0 018 4a4.5 4.5 0 013.8 2.1m0 0M11.8 6.5A4.5 4.5 0 018 12a4.5 4.5 0 01-3.8-2.1" />
     </svg>
   ),
+  Undo: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M5.5 5H12a2.5 2.5 0 010 5H8" />
+      <path d="M5.5 5l2.5-2.5M5.5 5l2.5 2.5" />
+    </svg>
+  ),
+  Branch: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <circle cx="5" cy="3.5" r="1.5" />
+      <circle cx="11" cy="12.5" r="1.5" />
+      <circle cx="5" cy="12.5" r="1.5" />
+      <path d="M5 5v4a3.5 3.5 0 003.5 3.5H9.5" />
+      <path d="M5 9h1.5A2.5 2.5 0 009 6.5V5" />
+    </svg>
+  ),
   Trash: (p: { className?: string }) => (
     <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
       <path d="M5.5 2.5h5M2.5 4.5h11M10.5 4.5v7.5a1 1 0 01-1 1h-3a1 1 0 01-1-1v-7.5M6.5 7v3.5M9.5 7v3.5" />

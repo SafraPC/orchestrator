@@ -4,6 +4,7 @@ set -euo pipefail
 REPO="${REPO:-SafraPC/orchestrator}"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 RELEASE_PAGE="https://github.com/${REPO}/releases/latest"
+RAW_BASE_URL="https://raw.githubusercontent.com/${REPO}/main"
 TMP_DIR="${TMPDIR:-/tmp}/orchestrator-install"
 mkdir -p "$TMP_DIR"
 
@@ -174,6 +175,17 @@ PY
   echo "[install] Dados persistentes: ~/Library/Application Support/dev.safra.orchestrator/orchestrator/core"
 }
 
+ensure_unix_build_deps() {
+  local helper="${TMP_DIR}/ensure-build-deps.sh"
+  if [[ -f "${BASH_SOURCE[0]}" && -f "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../unix/ensure-build-deps.sh" ]]; then
+    helper="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../unix/ensure-build-deps.sh"
+  else
+    curl -fsSL "${RAW_BASE_URL}/scripts/unix/ensure-build-deps.sh" -o "$helper"
+    chmod +x "$helper"
+  fi
+  eval "$("$helper" --persist)"
+}
+
 install_linux() {
   local file="$1"
   local lower="${file,,}"
@@ -223,12 +235,14 @@ EOF
     echo "[install] Formato Linux não suportado: $file"
     exit 1
   fi
+  ensure_unix_build_deps
   echo "[install] Dados persistentes: ~/.local/share/dev.safra.orchestrator/orchestrator/core"
 }
 
 case "$OS" in
   Darwin)
     install_macos "$ASSET_PATH"
+    ensure_unix_build_deps
     ;;
   Linux)
     install_linux "$ASSET_PATH"

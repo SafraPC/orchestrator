@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
+import { getServicePort } from "./serviceMeta";
 
 type PortStatus = "idle" | "checking" | "free" | "blocked";
 
@@ -9,6 +10,8 @@ type ServicePortModalProps = {
   open: boolean;
   serviceName: string | null;
   currentPort?: string;
+  detectedPort?: string | null;
+  hasCustomPort?: boolean;
   allServices?: ServiceDto[];
   onCancel: () => void;
   onConfirm: (serviceName: string, port: number) => Promise<void>;
@@ -44,7 +47,7 @@ export function ServicePortModal(props: ServicePortModalProps) {
       clearTimeout(checkTimer.current);
 
       const otherService = props.allServices?.find(
-        (s) => s.name !== props.serviceName && (s.env?.SERVER_PORT === String(port) || s.env?.PORT === String(port)),
+        (s) => s.name !== props.serviceName && getServicePort(s) === String(port),
       );
       if (otherService) {
         setPortStatus("blocked");
@@ -87,6 +90,13 @@ export function ServicePortModal(props: ServicePortModalProps) {
     return null;
   }, [value]);
 
+  const shouldWarnAboutCustomPort = useMemo(() => {
+    if (!props.detectedPort || error) {
+      return false;
+    }
+    return value.trim() !== props.detectedPort;
+  }, [error, props.detectedPort, value]);
+
   useEffect(() => {
     if (!props.open || error) {
       setPortStatus("idle");
@@ -102,7 +112,8 @@ export function ServicePortModal(props: ServicePortModalProps) {
     scheduleCheck(port);
   }, [value, props.open, error, props.currentPort, scheduleCheck]);
 
-  const canApply = !busy && !error && portStatus === "free";
+  const isResetChoice = !!props.hasCustomPort && !!props.detectedPort && value.trim() === props.detectedPort;
+  const canApply = !busy && !error && !isResetChoice && portStatus === "free";
 
   if (!props.open || !props.serviceName) return null;
 
@@ -131,6 +142,11 @@ export function ServicePortModal(props: ServicePortModalProps) {
                 onChange={(e) => setValue(e.target.value)}
                 className="input w-full px-2 py-1.5 text-xs"
               />
+              {props.detectedPort && (
+                <p className="text-2xs text-slate-500">
+                  Porta da aplicação: <span className="font-mono">{props.detectedPort}</span>
+                </p>
+              )}
               {error && <p className="text-2xs text-danger/90">{error}</p>}
               {!error && portStatus === "checking" && (
                 <p className="text-2xs text-slate-500 flex items-center gap-1">
@@ -143,6 +159,14 @@ export function ServicePortModal(props: ServicePortModalProps) {
               )}
               {!error && portStatus === "free" && (
                 <p className="text-2xs text-accent/70">Porta disponível</p>
+              )}
+              {!error && shouldWarnAboutCustomPort && (
+                <p className="text-2xs text-yellow-400/90">
+                  Forçar uma porta diferente pode falhar em alguns projetos.
+                </p>
+              )}
+              {!error && isResetChoice && (
+                <p className="text-2xs text-slate-500">Use o botão de reverter para remover a porta customizada.</p>
               )}
             </div>
           </div>

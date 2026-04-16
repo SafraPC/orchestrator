@@ -72,5 +72,18 @@ if ($DownloadPath.ToLowerInvariant().EndsWith(".msi")) {
   Start-Process -FilePath $DownloadPath -Wait
 }
 
+Write-Host "[install] Preparando Java 17+, Maven e Node locais"
+$LocalHelper = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "scripts\windows\ensure-build-deps.ps1"
+$HelperPath = $LocalHelper
+if (-not (Test-Path $HelperPath)) {
+  $HelperPath = Join-Path $TempDir "ensure-build-deps.ps1"
+  $HelperUrl = "https://raw.githubusercontent.com/$Repo/main/scripts/windows/ensure-build-deps.ps1"
+  Invoke-WebRequest -Uri $HelperUrl -OutFile $HelperPath -Headers $Headers
+}
+$DepsInfo = & $HelperPath -PersistUserEnvironment
+
 Write-Host "[install] Instalação concluída."
 Write-Host "[install] Dados persistentes: $env:APPDATA\\dev.safra.orchestrator\\orchestrator\\core"
+Write-Host "[install] Java: $($DepsInfo.JavaHome)"
+Write-Host "[install] Maven: $($DepsInfo.MavenHome)"
+Write-Host "[install] Node: $($DepsInfo.NodeHome)"

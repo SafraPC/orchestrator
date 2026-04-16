@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
+import { canChangeServicePort } from "./serviceMeta";
 
 function clampTop(top: number, height: number): number {
   const max = window.innerHeight - height - 8;
@@ -26,6 +27,7 @@ export function ContextMenu(props: {
   const { s } = props;
   const uniqueVersions = [...new Set(props.jdks.map((j) => j.majorVersion))];
   const isJs = s.projectType && s.projectType !== "SPRING_BOOT";
+  const canChangePort = canChangeServicePort(s);
   const scripts = s.availableScripts ?? [];
   const activeScript = s.selectedScript ?? (s.command?.[2] || null);
   const [openSub, setOpenSub] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function ContextMenu(props: {
           <MenuItem icon="Folder" label="Abrir pasta" onClick={async () => { props.onClose(); await api.openServiceFolder(s.name).catch(() => {}); }} />
           <MenuItem icon="Terminal" label="Abrir terminal" onClick={async () => { props.onClose(); await api.openServiceTerminal(s.name).catch(() => {}); }} />
           <MenuItem icon="Code" label="Abrir no editor" onClick={async () => { props.onClose(); await api.openServiceInEditor(s.name).catch(() => {}); }} />
-          {props.port && <MenuItem icon="Globe" label={`localhost:${props.port}`} onClick={async () => { props.onClose(); await openUrl(`http://localhost:${props.port}`).catch(() => {}); }} />}
+          {props.port && <MenuItem icon="Globe" label={`127.0.0.1:${props.port}`} onClick={async () => { props.onClose(); await openUrl(`http://127.0.0.1:${props.port}`).catch(() => {}); }} />}
 
           {uniqueVersions.length > 0 && (!s.projectType || s.projectType === "SPRING_BOOT") && (
             <>
@@ -123,7 +125,7 @@ export function ContextMenu(props: {
               </SubMenu>
             </>
           )}
-          {isJs && (
+          {isJs && canChangePort && (
             <MenuItem
               icon="Globe"
               label="Alterar porta"

@@ -11,6 +11,8 @@ import { SettingsPanel, useSettings } from "./SettingsPanel";
 import { StatusBar } from "./StatusBar";
 import { Toast, useToast } from "./Toast";
 import { Tooltip } from "./Tooltip";
+import { preserveCurrentBranches } from "./serviceMeta";
+import { useServiceBranchPolling } from "./useServiceBranchPolling";
 
 type CoreEvent = { event: string; payload: unknown };
 
@@ -74,7 +76,7 @@ export function App(props: { onReady?: () => void }) {
         }),
       ]);
       const [list, ctrs] = packed as [ServiceDto[], ContainerDto[]];
-      setServices(list);
+      setServices((prev) => preserveCurrentBranches(list, prev));
       setContainers(ctrs);
       setSelected((prev) => (prev && !list.some((s) => s.name === prev) ? null : prev));
       setJavaError(null);
@@ -99,6 +101,8 @@ export function App(props: { onReady?: () => void }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useServiceBranchPolling(services, setServices);
 
   useEffect(() => {
     if (!loading) props.onReady?.();

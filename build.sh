@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPS_HELPER="$ROOT_DIR/scripts/unix/ensure-build-deps.sh"
 
 CORE_DIR="$ROOT_DIR/orchestrator-core"
 DESKTOP_DIR="$ROOT_DIR/orchestrator-desktop"
@@ -21,9 +22,14 @@ require_cmd() {
 
 log "=== Build do Orchestrator ==="
 
+if [[ -x "$DEPS_HELPER" ]]; then
+  eval "$("$DEPS_HELPER")"
+fi
+
 require_cmd java
 require_cmd mvn
 require_cmd npm
+require_cmd cargo
 
 log "1. Compilando orchestrator-core (JAR)..."
 (

@@ -68,6 +68,7 @@ public class ProjectScanner {
           def.setLogFile(logsDir.resolve(serviceName + ".log").toString());
           def.setContainerIds(new ArrayList<>());
           def.setProjectType(ProjectType.SPRING_BOOT);
+          def.setDetectedPort(port);
 
           Map<String, String> env = new HashMap<>();
           env.put("SERVER_PORT", String.valueOf(port));

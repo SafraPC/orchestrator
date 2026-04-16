@@ -34,6 +34,7 @@ public class JavaVersionDetector {
 
   public List<JdkInfo> detectAll() {
     Map<String, JdkInfo> byPath = new LinkedHashMap<>();
+    scanWindowsLocalDeps(byPath);
     scanSdkman(byPath);
     scanHomebrew(byPath);
     scanWindowsProgramFiles(byPath);
@@ -132,6 +133,20 @@ public class JavaVersionDetector {
         dirs.filter(Files::isDirectory).forEach(d -> probeAndAdd(d, "Windows", out));
       } catch (Exception ignored) {
       }
+    }
+  }
+
+  private void scanWindowsLocalDeps(Map<String, JdkInfo> out) {
+    if (!System.getProperty("os.name").toLowerCase().contains("win")) return;
+    String localAppData = System.getenv("LOCALAPPDATA");
+    if (localAppData == null || localAppData.isBlank()) return;
+    Path deps = Path.of(localAppData, "OrchestratorBuildDeps");
+    if (!Files.isDirectory(deps)) return;
+    try (Stream<Path> dirs = Files.list(deps)) {
+      dirs.filter(Files::isDirectory)
+          .filter(d -> Files.exists(d.resolve("bin").resolve("java.exe")))
+          .forEach(d -> probeAndAdd(d, "Local", out));
+    } catch (Exception ignored) {
     }
   }
 

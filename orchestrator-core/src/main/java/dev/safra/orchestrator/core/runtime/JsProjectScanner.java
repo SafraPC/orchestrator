@@ -6,11 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,7 +19,6 @@ import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 
 public class JsProjectScanner {
-
   private static final Set<String> SKIP_DIRS = Set.of(
       ".git", "target", "node_modules", ".idea", ".next", "dist", "build", ".turbo", ".cache");
   private static final Pattern PORT_FLAG = Pattern.compile("(?:--port|--PORT|-p)\\s+(\\d+)");
@@ -78,45 +74,67 @@ public class JsProjectScanner {
 
   private ServiceDefinition parsePackageJson(Path pkgFile, Path dir) {
     try {
-      byte[] bytes = Files.readAllBytes(pkgFile);
-      if (bytes.length == 0) return null;
-      JsonNode root = om.readTree(bytes);
-
-      if (isMonorepoRoot(root)) return null;
-
-      ProjectType type = detectType(root);
-      if (type == null) return null;
-
+      JsMetadata metadata = readMetadata(dir, null);
+      if (metadata == null) return null;
       String serviceName = dir.getFileName().toString();
-      List<String> scripts = extractScripts(root);
-      if (scripts.isEmpty()) return null;
-
-      int port = extractPort(root, type, dir);
-      String defaultScript = pickDefaultScript(scripts, type);
-
       ServiceDefinition def = new ServiceDefinition();
       def.setName(serviceName);
       def.setPath(dir.toAbsolutePath().normalize().toString());
       def.setLogFile(logsDir.resolve(serviceName + ".log").toString());
       def.setContainerIds(new ArrayList<>());
-      def.setProjectType(type);
-      def.setAvailableScripts(scripts);
-      boolean isViteScript = isViteScript(root, defaultScript);
-      if (isViteScript) {
-        def.setCommand(List.of("npm", "run", defaultScript, "--", "--port", String.valueOf(port), "--strictPort"));
-      } else {
-        def.setCommand(List.of("npm", "run", defaultScript));
-      }
-
-      Map<String, String> env = new HashMap<>();
-      env.put("SERVER_PORT", String.valueOf(port));
-      env.put("PORT", String.valueOf(port));
-      def.setEnv(env);
+      def.setProjectType(metadata.projectType());
+      def.setAvailableScripts(metadata.scripts());
+      def.setDetectedPort(metadata.detectedPort());
+      def.setPortStrategy(metadata.portStrategy());
+      def.setSelectedScript(metadata.selectedScript());
+      def.setCommand(List.of("npm", "run", metadata.selectedScript()));
 
       return def;
     } catch (Exception e) {
       return null;
     }
+  }
+
+  public void refreshServiceDefinition(ServiceDefinition def) {
+    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
+      return;
+    }
+    try {
+      JsMetadata metadata = readMetadata(Path.of(def.getPath()), def.getSelectedScript());
+      if (metadata == null) {
+        return;
+      }
+      def.setAvailableScripts(metadata.scripts());
+      def.setDetectedPort(metadata.detectedPort());
+      def.setPortStrategy(metadata.portStrategy());
+      def.setSelectedScript(metadata.selectedScript());
+      def.setCommand(List.of("npm", "run", metadata.selectedScript()));
+    } catch (Exception ignored) {
+    }
+  }
+
+  private JsMetadata readMetadata(Path dir, String preferredScript) throws Exception {
+    Path pkgFile = dir.resolve("package.json");
+    byte[] bytes = Files.readAllBytes(pkgFile);
+    if (bytes.length == 0) return null;
+    JsonNode root = om.readTree(bytes);
+
+    if (isMonorepoRoot(root)) return null;
+
+    ProjectType type = detectType(root);
+    if (type == null) return null;
+
+    List<String> scripts = extractScripts(root);
+    if (scripts.isEmpty()) return null;
+
+    String selectedScript = selectScript(scripts, type, preferredScript);
+    String scriptCommand = root.path("scripts").path(selectedScript).asText("");
+    return new JsMetadata(
+        type,
+        scripts,
+        selectedScript,
+        extractPort(root, dir, selectedScript),
+        resolvePortStrategy(scriptCommand));
   }
 
   private boolean isMonorepoRoot(JsonNode root) {
@@ -147,18 +165,23 @@ public class JsProjectScanner {
     if (scripts.isMissingNode() || !scripts.isObject()) return List.of();
     List<String> out = new ArrayList<>();
     scripts.fieldNames().forEachRemaining(out::add);
-    Collections.sort(out, String.CASE_INSENSITIVE_ORDER);
     return out;
   }
 
-  private int extractPort(JsonNode root, ProjectType type, Path dir) {
+  private int extractPort(JsonNode root, Path dir, String selectedScript) {
     JsonNode scripts = root.path("scripts");
+    if (scripts.isObject() && scripts.has(selectedScript)) {
+      Matcher selectedMatch = PORT_FLAG.matcher(scripts.get(selectedScript).asText(""));
+      if (selectedMatch.find()) {
+        try { return Integer.parseInt(selectedMatch.group(1)); } catch (NumberFormatException ignored) {}
+      }
+    }
     if (scripts.isObject()) {
-      for (var it = scripts.fields(); it.hasNext(); ) {
+      for (var it = scripts.fields(); it.hasNext();) {
         var entry = it.next();
-        Matcher m = PORT_FLAG.matcher(entry.getValue().asText(""));
-        if (m.find()) {
-          try { return Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) {}
+        Matcher match = PORT_FLAG.matcher(entry.getValue().asText(""));
+        if (match.find()) {
+          try { return Integer.parseInt(match.group(1)); } catch (NumberFormatException ignored) {}
         }
       }
     }
@@ -174,20 +197,24 @@ public class JsProjectScanner {
       } catch (Exception ignored) {}
     }
     if (hasDep(root.path("dependencies"), "vite") || hasDep(root.path("devDependencies"), "vite")) return 5173;
-    return switch (type) {
-      case VUE -> 5173;
-      default -> 3000;
-    };
+    return 3000;
   }
 
-  private boolean isViteScript(JsonNode root, String scriptName) {
-    JsonNode scripts = root.path("scripts");
-    if (!scripts.isObject() || !scripts.has(scriptName)) return false;
-    String cmd = scripts.get(scriptName).asText("").toLowerCase();
-    return cmd.contains("vite");
+  private String resolvePortStrategy(String scriptCommand) {
+    String cmd = scriptCommand.toLowerCase();
+    if (cmd.contains("vite")) return "CLI";
+    if (cmd.contains("next ")) return "CLI";
+    if (cmd.startsWith("next")) return "CLI";
+    if (cmd.contains("nuxt")) return "CLI";
+    if (cmd.contains("webpack serve") || cmd.contains("webpack-dev-server")) return "CLI";
+    if (cmd.contains("vue-cli-service serve")) return "CLI";
+    return "UNSUPPORTED";
   }
 
-  private String pickDefaultScript(List<String> scripts, ProjectType type) {
+  private String selectScript(List<String> scripts, ProjectType type, String preferredScript) {
+    if (preferredScript != null && !preferredScript.isBlank() && scripts.contains(preferredScript)) {
+      return preferredScript;
+    }
     if (type == ProjectType.NEST) {
       if (scripts.contains("start:dev")) return "start:dev";
       if (scripts.contains("start:debug")) return "start:debug";
@@ -196,5 +223,13 @@ public class JsProjectScanner {
     if (scripts.contains("start")) return "start";
     if (scripts.contains("serve")) return "serve";
     return scripts.get(0);
+  }
+
+  private record JsMetadata(
+      ProjectType projectType,
+      List<String> scripts,
+      String selectedScript,
+      int detectedPort,
+      String portStrategy) {
   }
 }

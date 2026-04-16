@@ -12,6 +12,9 @@ public class ServiceDefinition {
   private List<String> command;
   private String logFile;
   private Map<String, String> env;
+  private Integer detectedPort;
+  private Integer customPort;
+  private String portStrategy;
   private String javaHome;
   private String javaVersion;
   private List<String> containerIds;

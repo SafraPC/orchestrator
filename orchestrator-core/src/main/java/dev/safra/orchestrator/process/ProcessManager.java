@@ -1,11 +1,13 @@
 package dev.safra.orchestrator.process;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +31,6 @@ public class ProcessManager {
 
   public long start(ServiceDefinition def) {
     validateDefinition(def);
-    freePort(def);
     try {
       Path workDir = Path.of(def.getPath()).toAbsolutePath().normalize();
       Path logPath = Path.of(def.getLogFile()).toAbsolutePath().normalize();
@@ -40,6 +41,10 @@ public class ProcessManager {
 
       List<String> cmd = new ArrayList<>(def.getCommand());
       boolean isJava = def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT;
+      Integer startupPort = resolveStartupPort(def, isJava);
+      Map<String, String> startupEnv = buildStartupEnv(def, isJava, startupPort);
+
+      freePort(startupPort);
 
       if (isJava) {
         cmd = MavenLaunchCommands.normalizeWindowsMvnw(cmd, workDir);
@@ -54,14 +59,10 @@ public class ProcessManager {
       }
 
       if (!isJava) {
-        if (def.getEnv() != null && cmd.size() >= 3 && "npm".equalsIgnoreCase(cmd.get(0)) && "run".equalsIgnoreCase(cmd.get(1))
-            && !cmd.contains("--port")) {
-          String jsPort = def.getEnv().getOrDefault("PORT", def.getEnv().get("SERVER_PORT"));
-          if (jsPort != null && !jsPort.isBlank()) { cmd = new ArrayList<>(cmd); cmd.add("--"); cmd.add("--port"); cmd.add(jsPort.trim()); cmd.add("--strictPort"); }
-        }
+        cmd = applyCustomJsPort(def, cmd, startupPort);
         String joined = String.join(" ", cmd);
         if (isWindows()) {
-          cmd = List.of("cmd.exe", "/c", joined);
+          cmd = List.of("cmd.exe", "/d", "/s", "/c", "chcp 65001>nul && " + joined);
         } else {
           String shell = System.getenv("SHELL");
           if (shell == null || shell.isBlank()) shell = "/bin/zsh";
@@ -75,7 +76,7 @@ public class ProcessManager {
       pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logPath.toFile()));
 
       Map<String, String> env = pb.environment();
-      if (def.getEnv() != null) env.putAll(def.getEnv());
+      env.putAll(startupEnv);
 
       String path = env.getOrDefault("PATH", "");
 
@@ -84,6 +85,8 @@ public class ProcessManager {
       } else {
         path = setupNodePath(env, path, workDir);
       }
+
+      applyUtf8Env(env, isJava);
 
       for (String extra : new String[]{"/opt/homebrew/bin", "/usr/local/bin"}) {
         if (!path.contains(extra) && Files.isDirectory(Path.of(extra))) path = prependPath(path, extra);
@@ -96,7 +99,7 @@ public class ProcessManager {
             ? "[orchestrator] Iniciando com JAVA_HOME=" + env.getOrDefault("JAVA_HOME", "system")
             : "[orchestrator] Iniciando projeto " + def.getProjectType();
         Files.writeString(logPath, info + "\n",
-            java.nio.charset.StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
+            StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
       } catch (Exception ignored) {
       }
 
@@ -295,8 +298,93 @@ public class ProcessManager {
     return entry + File.pathSeparator + path;
   }
 
-  private void freePort(ServiceDefinition def) {
-    PortProcessKiller.freePort(def.getEnv(), isWindows());
+  private Integer resolveStartupPort(ServiceDefinition def, boolean isJava) {
+    if (!isJava && def.getCustomPort() != null) {
+      return def.getCustomPort();
+    }
+    if (def.getDetectedPort() != null) {
+      return def.getDetectedPort();
+    }
+    if (def.getEnv() == null) {
+      return null;
+    }
+    String port = def.getEnv().getOrDefault("SERVER_PORT", def.getEnv().get("PORT"));
+    if (port == null || port.isBlank()) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(port.trim());
+    } catch (NumberFormatException ignored) {
+      return null;
+    }
+  }
+
+  private Map<String, String> buildStartupEnv(ServiceDefinition def, boolean isJava, Integer startupPort) {
+    Map<String, String> env = new HashMap<>();
+    if (def.getEnv() != null) {
+      env.putAll(def.getEnv());
+    }
+    if (!isJava) {
+      env.remove("SERVER_PORT");
+      env.remove("PORT");
+      if (def.getCustomPort() != null && startupPort != null && "ENV".equalsIgnoreCase(def.getPortStrategy())) {
+        String port = String.valueOf(startupPort);
+        env.put("SERVER_PORT", port);
+        env.put("PORT", port);
+      }
+    }
+    return env;
+  }
+
+  private List<String> applyCustomJsPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
+    if (startupPort == null || def.getCustomPort() == null || !"CLI".equalsIgnoreCase(def.getPortStrategy())) {
+      return cmd;
+    }
+    List<String> updated = new ArrayList<>(cmd);
+    String value = String.valueOf(startupPort);
+    boolean changed = false;
+    for (int i = 0; i < updated.size(); i++) {
+      String token = updated.get(i);
+      if ("--port".equalsIgnoreCase(token) || "-p".equalsIgnoreCase(token)) {
+        if (i + 1 < updated.size()) {
+          updated.set(i + 1, value);
+          changed = true;
+        }
+      } else if (token.startsWith("--port=")) {
+        updated.set(i, "--port=" + value);
+        changed = true;
+      } else if (token.startsWith("--PORT=")) {
+        updated.set(i, "--PORT=" + value);
+        changed = true;
+      }
+    }
+    if (!changed && updated.size() >= 2 && "npm".equalsIgnoreCase(updated.get(0)) && "run".equalsIgnoreCase(updated.get(1))) {
+      updated.add("--");
+      updated.add("--port");
+      updated.add(value);
+      updated.add("--strictPort");
+    }
+    return updated;
+  }
+
+  private void applyUtf8Env(Map<String, String> env, boolean isJava) {
+    env.put("LANG", "en_US.UTF-8");
+    env.put("LC_ALL", "en_US.UTF-8");
+    env.put("PYTHONIOENCODING", "utf-8");
+    if (!isJava) {
+      return;
+    }
+    String utf8Flags = "-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8";
+    env.merge("JAVA_TOOL_OPTIONS", utf8Flags, (current, extra) -> current.contains(extra) ? current : current + " " + extra);
+    env.merge("MAVEN_OPTS", utf8Flags, (current, extra) -> current.contains(extra) ? current : current + " " + extra);
+  }
+
+  private void freePort(Integer port) {
+    if (port == null) {
+      return;
+    }
+    Map<String, String> env = Map.of("SERVER_PORT", String.valueOf(port));
+    PortProcessKiller.freePort(env, isWindows());
   }
 
   private void monitorProcess(long pid, String serviceName) {

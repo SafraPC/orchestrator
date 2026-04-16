@@ -9,29 +9,6 @@ $DesktopDir = Join-Path $Root "orchestrator-desktop"
 $JarPath = Join-Path $CoreDir "target\orchestrator-core-standalone.jar"
 $JarDest = Join-Path $DesktopDir "src-tauri\orchestrator-core-standalone.jar"
 
-$Deps = Join-Path $env:LOCALAPPDATA "OrchestratorBuildDeps"
-$LocalMvnBin = Join-Path $Deps "apache-maven-3.9.9\bin"
-$LocalNode = Join-Path $Deps "node-v20.18.3-win-x64"
-if (Test-Path (Join-Path $LocalMvnBin "mvn.cmd")) {
-  if ($env:Path -notlike "*$LocalMvnBin*") {
-    $env:Path = "$LocalMvnBin;$env:Path"
-  }
-  if (-not $env:MAVEN_HOME) {
-    $env:MAVEN_HOME = Join-Path $Deps "apache-maven-3.9.9"
-  }
-}
-if (Test-Path (Join-Path $LocalNode "npm.cmd")) {
-  if ($env:Path -notlike "*$LocalNode*") {
-    $env:Path = "$LocalNode;$env:Path"
-  }
-}
-$LocalCargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
-if (Test-Path (Join-Path $LocalCargoBin "cargo.exe")) {
-  if ($env:Path -notlike "*$LocalCargoBin*") {
-    $env:Path = "$LocalCargoBin;$env:Path"
-  }
-}
-
 function Resolve-Mvn {
   $g = Get-Command mvn -ErrorAction SilentlyContinue
   if ($g) {
@@ -93,26 +70,24 @@ function Resolve-Cargo {
   return $null
 }
 
-function Require-Java {
-  if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-    throw "java nao encontrado no PATH. Instale JDK 17+."
-  }
-}
-
 Write-Host ""
 Write-Host "[build] === Build do Orchestrator ==="
 
-Require-Java
+$DepsTool = Join-Path $Root "scripts\windows\ensure-build-deps.ps1"
+$DepsInfo = & $DepsTool
+Write-Host "[build] Java: $($DepsInfo.JavaExe)"
+Write-Host "[build] Maven local: $($DepsInfo.MvnCmd)"
+Write-Host "[build] Node local: $($DepsInfo.NpmCmd)"
 
 $Mvn = Resolve-Mvn
 if (-not $Mvn) {
-  throw "mvn nao encontrado. Adicione Maven ao PATH ou defina MAVEN_HOME (ex.: C:\apache-maven-3.9.9)."
+  $Mvn = $DepsInfo.MvnCmd
 }
 Write-Host "[build] Maven: $Mvn"
 
 $Npm = Resolve-Npm
 if (-not $Npm) {
-  throw "npm nao encontrado. Instale Node.js LTS ou adicione ao PATH."
+  $Npm = $DepsInfo.NpmCmd
 }
 Write-Host "[build] npm: $Npm"
 

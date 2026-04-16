@@ -64,6 +64,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - ping, getWorkspace, setExcludeDirs
 - importRootAndScan, importRootsAndScan, removeRoot, scanRoots
 - listServices, startService, stopService, restartService, startAll, stopAll
+- listServiceBranches
 - removeService
 - subscribeLogs, unsubscribeLogs
 - createContainer, updateContainer, deleteContainer, listContainers
@@ -86,6 +87,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - importRootsAndScan: folders with pom.xml added as direct services, others as roots
 - Service removal clears containerIds before removing
 - Ports auto-detected from application.properties/yml, fallback to hash-based
+- JS services keep `detectedPort` only for UI; only scripts com `portStrategy=CLI` aceitam `customPort`. `listServices` re-lê `package.json` para sincronizar scripts/porta/strategy
 
 ## Desktop Module (Tauri + React)
 
@@ -113,6 +115,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 ### API Client (api/client.ts)
 - `core()` serializa chamadas a `invoke("core_request")` numa fila (evita vários IPC em paralelo no Windows)
 - Types in `api/types.ts`: ServiceDto, ContainerDto, WorkspaceDto, StopResultDto
+- Branch atual é buscada por polling via `listServiceBranches` e mesclada no estado do React
 
 ### Keyboard Shortcuts
 - Ctrl+S: start selected service
@@ -124,7 +127,9 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - `./build.sh` — full build: core JAR → copy to Tauri → frontend build → Tauri build (macOS/Linux/Git Bash)
 - `build.ps1` / `build.cmd` — mesmo fluxo no Windows; `build.cmd` chama `vcvars64.bat` (MSVC) quando existir Build Tools 2022, depois PowerShell com `ExecutionPolicy Bypass`; após mover a pasta do repo, se o Tauri falhar com caminho antigo em `target\`, use `build.cmd -CleanTauriTarget` ou `ORCHESTRATOR_CLEAN_TAURI_TARGET=1`
 - `build.ps1` antepõe `%LOCALAPPDATA%\OrchestratorBuildDeps` (Maven/Node portáteis se existirem), resolve `mvn`/`npm`/`cargo` via PATH, `MAVEN_HOME`, ou caminhos comuns; falha de passo propaga exit code
-- `./start.sh` (macOS/Linux) ou **`start.cmd` / `start.ps1`** (Windows) — `start.ps1` antecede PATH com Maven/Node/Cargo portáteis (`%LOCALAPPDATA%\OrchestratorBuildDeps`, `.cargo\bin`): escolhe a pasta **`apache-maven-*`** e **`node-v*`** com `npm.cmd` mais recente por `LastWriteTime` (fallback 3.9.9 / node-v20.18.3); `run-dev.mjs` espelha a mesma lógica. Dev: **`devUrl`** em `tauri.conf.json` deve ser `http://127.0.0.1:5173` (alinhado ao Vite `--host 127.0.0.1`; `localhost` no Windows costuma falhar). mesmo fluxo que `start.sh`: Maven gera o JAR → Vite em background (`.orchestrator/pids/ui.pid`; `--host 127.0.0.1` alinhado ao check HTTP; Windows sem `detached`/FD em spawn para evitar EINVAL) → `tauri dev` em primeiro plano; ao sair do Tauri mata o Vite. **`ORCHESTRATOR_DEV_STOP_AFTER_VITE=1`** (herdado pelo processo do `node`): para após Vite OK sem subir Tauri (verificação/CI). `orchestrator-desktop`: `npm run dev:full` chama o mesmo script Node (`scripts/run-dev.mjs`). `beforeDevCommand` no Tauri fica vazio (Vite já vem do script)
+- `./start.sh` (macOS/Linux) ou **`start.cmd` / `start.ps1`** (Windows) — ambos delegam ao `scripts/run-dev.mjs`; mantenha `devUrl` em `http://127.0.0.1:5173` e o Vite em `--host 127.0.0.1` para não travar o `tauri dev`
+- Bootstrap Windows fica em `scripts/windows/ensure-build-deps.ps1`; instala Java 17+, Maven e Node em `%LOCALAPPDATA%\OrchestratorBuildDeps`, remove bloqueios de download e pode persistir `JAVA_HOME`/`MAVEN_HOME`/`Path`
+- Bootstrap macOS/Linux fica em `scripts/unix/ensure-build-deps.sh`; instala Java 17+, Maven e Node em `~/.local/share/OrchestratorBuildDeps`, pode persistir `JAVA_HOME`/`MAVEN_HOME`/`PATH`, e é usado por `start.sh`, `build.sh` e `scripts/install/install.sh`
 - `scripts/install/install.sh` — install automático para macOS/Linux via release latest
 - `scripts/install/install.ps1` — install automático para Windows via release latest
 - Output: `.app`/`.dmg` in `orchestrator-desktop/src-tauri/target/release/bundle/`
@@ -148,6 +153,8 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - Container = logical group of services (NOT Docker)
 - Service = Spring Boot project discovered via pom.xml scan
 - All IPC is synchronous request/response except log events (async stream); `core_bridge` usa **`session` Mutex** único: `ensure_started` + escrita stdin + `recv` + `cleanup` na mesma exclusão mútua (sem corridas com `set_java_runtime_path` / timeout); timeout de recv **mata** o JVM e limpa `pending`; **uma retentativa** em `CORE_SHUTDOWN` ou erros de transporte. Reader do stdout do core deve usar **`read_until` + `from_utf8_lossy`** (não `lines().flatten()`) para não perder respostas com bytes inválidos. Eventos `core_event`: `async_runtime::spawn` + emit. Core **não** sobe no `.setup` do Tauri. **`start.cmd`** zera `ORCHESTRATOR_SKIP_MVN_CLEAN` antes do PS1 para forçar rebuild; **`run-dev.mjs`**: Maven default **`clean package`** (skip clean só com `ORCHESTRATOR_SKIP_MVN_CLEAN=1`). Smoke: `npm run verify:core-ipc`
+- Windows runtime: `java_runtime.rs` tenta JDK local em `%LOCALAPPDATA%\OrchestratorBuildDeps` antes do PATH; `MavenLaunchCommands` resolve `mvn.cmd` por `MAVEN_HOME`, `PATH` e deps locais
+- Unix runtime: `java_runtime.rs` também tenta JDK local em `~/.local/share/OrchestratorBuildDeps` antes do PATH
 - State persisted as JSON files, no database
 - Max 300 lines per file
 - No comments in code

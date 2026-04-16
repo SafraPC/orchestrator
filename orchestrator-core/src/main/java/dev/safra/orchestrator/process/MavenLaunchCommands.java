@@ -62,10 +62,11 @@ public final class MavenLaunchCommands {
     if (!isWindows() || cmd.isEmpty() || !"mvn".equalsIgnoreCase(cmd.get(0))) {
       return cmd;
     }
+    String launcher = resolveMvnCmd().map(Path::toString).orElse("mvn.cmd");
     List<String> next = new ArrayList<>();
     next.add("cmd.exe");
     next.add("/c");
-    next.add("mvn.cmd");
+    next.add(launcher);
     for (int i = 1; i < cmd.size(); i++) {
       next.add(cmd.get(i));
     }
@@ -82,6 +83,16 @@ public final class MavenLaunchCommands {
       Path mvn = Path.of(mavenHome, "bin", "mvn.cmd");
       if (Files.exists(mvn)) {
         return Optional.of(mvn);
+      }
+    }
+    String path = System.getenv("PATH");
+    if (path != null && !path.isBlank()) {
+      for (String entry : path.split(java.io.File.pathSeparator)) {
+        if (entry == null || entry.isBlank()) continue;
+        Path mvn = Path.of(entry, "mvn.cmd");
+        if (Files.exists(mvn)) {
+          return Optional.of(mvn);
+        }
       }
     }
     String localAppData = System.getenv("LOCALAPPDATA");

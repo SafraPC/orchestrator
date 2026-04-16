@@ -1,208 +1,111 @@
 # Orchestrator
 
-<p align="center">Desktop orchestration for local Spring and JavaScript projects, including React, Next.js, NestJS, and Vue.</p>
+<p align="center">
+  <strong>Professional desktop control plane for local development services.</strong>
+</p>
+
+<p align="center">
+  Import Spring Boot, React, Next.js, NestJS, and Vue projects. Start faster, organize better, and keep local environments under control.
+</p>
 
 <p align="center">
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/SafraPC/orchestrator?display_name=release">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/SafraPC/orchestrator?display_name=release&style=for-the-badge">
   </a>
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
-    <img alt="Total downloads" src="https://img.shields.io/github/downloads/SafraPC/orchestrator/total">
+    <img alt="Downloads" src="https://img.shields.io/github/downloads/SafraPC/orchestrator/total?style=for-the-badge">
   </a>
   <a href="./LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/SafraPC/orchestrator">
+    <img alt="License" src="https://img.shields.io/github/license/SafraPC/orchestrator?style=for-the-badge">
   </a>
-  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-1f6feb">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=for-the-badge">
 </p>
 
-<p align="center">
-  <a href="https://github.com/SafraPC/orchestrator/releases/latest">
-    <img alt="Download for macOS, Windows, and Linux" src="https://img.shields.io/badge/Download-macOS%20%7C%20Windows%20%7C%20Linux-2ea44f?style=for-the-badge">
-  </a>
-</p>
+## What It Delivers
 
-> Import project folders, detect runnable services, group them into logical containers, and control the full local development lifecycle from a single desktop application.
+- Centralized control for local services.
+- Clean grouping with logical containers.
+- Fast start, stop, and restart flows.
+- Live logs with search and monitoring.
+- Branch visibility for Git-based projects.
+- Persistent workspace state across sessions.
 
-No Docker required.
+## Supported Stacks
+
+| Stack | Detection |
+| --- | --- |
+| Spring Boot | `pom.xml` |
+| Next.js | `package.json` |
+| NestJS | `package.json` |
+| React | `package.json` |
+| Vue | `package.json` |
 
 ## Download
 
-Prebuilt installers are published with every release.
+Releases are published for macOS, Windows, and Linux.
 
-**Download for macOS, Windows, and Linux:** [Latest release](https://github.com/SafraPC/orchestrator/releases/latest)
-
-| Platform | Recommended package | Fallbacks |
+| Platform | Recommended package | Notes |
 | --- | --- | --- |
-| macOS (Intel and Apple Silicon) | `.dmg` | - |
-| Windows | `.msi` | `.exe` |
-| Linux (Ubuntu and Debian) | `.deb` | `.AppImage`, `.rpm` |
-| Linux (Arch) | `.AppImage` | `.pkg.tar.zst` |
-| Linux (generic) | `.AppImage` | `.deb`, `.rpm` |
+| macOS | `.dmg` | Intel and Apple Silicon |
+| Windows | `.msi` | `.exe` also available |
+| Linux Debian/Ubuntu | `.deb` | Best desktop integration |
+| Linux Arch | `.pkg.tar.zst` or `.AppImage` | Use distro preference |
+| Linux generic | `.AppImage` | Portable fallback |
 
-Repository-based installs can use `scripts/install/install.sh` or `scripts/install/install.ps1` to select the latest compatible asset automatically.
+Latest release:
 
-Linux one-line install:
-
-```bash
-curl -fsSL https://github.com/SafraPC/orchestrator/releases/latest/download/install.sh | bash
-```
-
-## Requirements
-
-Orchestrator has two different requirement sets: one for using the released app, and one for developing this repository.
-
-| Scenario | Required | Optional |
-| --- | --- | --- |
-| Use the released desktop app | Java 17+ in `PATH` | `JAVA_HOME` configured |
-| Run Spring services | JDK compatible with each service | Maven or `mvnw` |
-| Run Next.js, NestJS, React, or Vue services | Node.js compatible with each project | `nvm`, `fnm`, or Volta |
-| Develop this repository | Java 17+, Maven, Node.js 18+, Rust stable | OS-specific Tauri dependencies |
-
-- End users do not need Rust to use the released app.
-- End users do not need Maven or Node.js unless imported services depend on them.
-- The desktop app launches the bundled core with the system `java` command.
-- If `java` is not available in `PATH`, the app will not start.
-- `JAVA_HOME` is the recommended default JDK for Spring services.
-- Windows installers handle `WebView2` automatically on supported systems.
-- On Linux, prefer `.deb` or `.rpm` because Tauri relies on system `WebKitGTK` libraries.
-
-## Java Setup
-
-**Recommended JDK:** [Eclipse Temurin 17](https://adoptium.net/temurin/releases/?version=17)
-
-Use Java 17 or newer.
-Prefer a JDK, not only a JRE.
-App startup requires `java` in `PATH`.
-Spring services use `JAVA_HOME` by default.
-When multiple JDKs are detected, the app can switch versions per service.
-
-Verify:
-
-```bash
-java -version
-```
-
-<details>
-<summary>macOS</summary>
-
-```bash
-brew install --cask temurin@17
-echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 17)' >> ~/.zshrc
-echo 'export PATH="$JAVA_HOME/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-java -version && echo $JAVA_HOME
-```
-
-If you use `bash`, replace `~/.zshrc` with `~/.bash_profile` or `~/.bashrc`.
-
-</details>
-
-<details>
-<summary>Windows</summary>
-
-```powershell
-winget install EclipseAdoptium.Temurin.17.JDK
-java -version
-echo $env:JAVA_HOME
-where.exe java
-```
-
-If `JAVA_HOME` is empty, create it in `System Properties` -> `Environment Variables` and add `%JAVA_HOME%\bin` to `Path`.
-
-</details>
-
-<details>
-<summary>Linux</summary>
-
-Recommended for multiple JDKs: SDKMAN.
-
-```bash
-curl -s "https://get.sdkman.io" | bash
-source "$HOME/.sdkman/bin/sdkman-init.sh"
-sdk install java 17-tem
-sdk default java 17-tem
-java -version && echo $JAVA_HOME
-```
-
-Ubuntu and Debian alternative:
-
-```bash
-sudo apt update
-sudo apt install -y openjdk-17-jdk
-export JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")
-export PATH="$JAVA_HOME/bin:$PATH"
-java -version && echo $JAVA_HOME
-```
-
-Prefer `.deb` on Debian and Ubuntu.
-Prefer distro packages over `.AppImage` when possible.
-
-</details>
+[`github.com/SafraPC/orchestrator/releases/latest`](https://github.com/SafraPC/orchestrator/releases/latest)
 
 ## Installation
 
-If you skipped the download section, use one of the options below.
+### Desktop install
 
-### Desktop installers
+- macOS: download latest `.dmg`
+- Windows: download latest `.msi`
+- Linux: prefer `.deb`, then `.AppImage`
 
-- macOS: [Download the latest `.dmg`](https://github.com/SafraPC/orchestrator/releases/latest)
-- Windows: [Download the latest `.msi`](https://github.com/SafraPC/orchestrator/releases/latest)
-- Linux: [Download the latest `.deb` or `.AppImage`](https://github.com/SafraPC/orchestrator/releases/latest)
+### Scripted install
 
-### Linux install with curl
+Repository installers select the best release asset automatically.
 
-This is the simplest Linux path for Debian, Ubuntu, Arch, and generic distributions.
+Linux and macOS:
 
 ```bash
-curl -fsSL https://github.com/SafraPC/orchestrator/releases/latest/download/install.sh | bash
+bash scripts/install/install.sh
 ```
 
-### Security prompts
+Windows:
 
-- Windows: `SmartScreen` warnings will continue until the installer is code-signed with a trusted certificate.
-- Ubuntu and Debian: a standalone `.deb` downloaded from the browser is not the same as installing from a signed APT repository, so software centers may still show an unknown source warning.
-- Linux CLI installation is recommended when you want to avoid the GUI installer path for the downloaded `.deb`.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
+```
 
-## Why Orchestrator
+## Runtime Requirements
 
-- Centralizes local service operations in one desktop app.
-- Reduces repetitive terminal work during daily development.
-- Organizes services by logical containers instead of shell sessions.
-- Streams logs in real time with search and filtering.
-- Preserves workspace and runtime state between sessions.
-
-## Feature Overview
-
-| Area | Capabilities |
+| Scenario | Required |
 | --- | --- |
-| Discovery | Import folders, scan roots, auto-detect runnable projects |
-| Service lifecycle | Start, stop, restart, and operate services in batch |
-| Organization | Group services into logical containers and filter views |
-| Observability | Follow live logs, search log output, monitor grouped services |
-| Developer actions | Open a service folder, terminal, or editor directly |
-| Persistence | Keep imported roots, runtime state, and container assignments |
+| Open desktop app | Java 17+ |
+| Run Spring services | Project-compatible JDK and Maven or `mvnw` |
+| Run JavaScript services | Project-compatible Node.js |
+| Develop this repository | Java 17+, Maven, Node.js, Rust stable |
 
-## Supported Project Types
+Notes:
 
-The orchestrator supports Spring services and common JavaScript projects discovered through `pom.xml` and `package.json`.
-
-| Project type | Detection strategy |
-| --- | --- |
-| Spring Boot | `pom.xml` scan |
-| Next.js | `package.json` dependency detection |
-| NestJS | `package.json` dependency detection |
-| React | `package.json` dependency detection |
-| Vue | `package.json` dependency detection |
+- Windows installer prepares local Java, Maven, and Node automatically.
+- macOS and Linux helper scripts now prepare local Java, Maven, and Node automatically for repo flows and scripted install flows.
+- Linux desktop builds still require Tauri system packages from the official docs.
+- Rust is only needed to develop or bundle this repository.
 
 ## Quick Start
 
-1. Download the latest release for your platform.
-2. Open the app and import one or more project folders.
-3. Review detected services and organize them into containers.
-4. Start a single service or an entire container.
-5. Follow live logs and use quick actions to open the folder, terminal, or editor.
+1. Install the app for your platform.
+2. Import one or more project folders.
+3. Review detected services.
+4. Group services into containers.
+5. Start one service or a full container.
+6. Follow logs and open local tools from the UI.
 
-### Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 | --- | --- |
@@ -215,18 +118,17 @@ The orchestrator supports Spring services and common JavaScript projects discove
 
 ```text
 orchestrator-core/      Java 17 orchestration engine
-orchestrator-desktop/   Tauri desktop application
+orchestrator-desktop/   Tauri desktop shell + React UI
 ```
 
 Request flow:
 
-1. React UI sends a command through Tauri.
+1. React sends a command through Tauri.
 2. Rust forwards the request to the Java core over JSON IPC.
-3. The core executes the local action and returns a response.
+3. The core executes the local action.
 4. The UI receives responses and async log events.
 
-<details>
-<summary>IPC message shapes</summary>
+IPC shapes:
 
 ```json
 {"id":"uuid","method":"methodName","params":{}}
@@ -234,76 +136,54 @@ Request flow:
 {"event":"eventName","payload":{}}
 ```
 
-</details>
-
 ## Local Development
 
-### Prerequisites
-
-| Tool | Version | Download |
-| --- | --- | --- |
-| Java | 17+ JDK | [Temurin 17](https://adoptium.net/temurin/releases/?version=17) |
-| Maven | 3.6+ | [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
-| Rust | Stable | [rustup.rs](https://rustup.rs/) |
-
-### Development Setup
-
-No project-specific Rust version is pinned.
-Use the current stable toolchain.
-
-Install Rust on macOS and Linux:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustc --version
-```
-
-Install Rust on Windows from [rustup.rs](https://rustup.rs/), then verify with `rustc --version`.
-
-Platform-specific notes:
-
-- macOS: run `xcode-select --install`
-- Windows: install Visual Studio Build Tools with `Desktop development with C++`
-- Linux: install the Tauri system packages for your distro
-
-Debian and Ubuntu example:
-
-```bash
-sudo apt update
-sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-```
-
-Other Linux distributions should follow the official Tauri prerequisites: [v2.tauri.app/start/prerequisites](https://v2.tauri.app/start/prerequisites/)
-
 ### Start development mode
+
+macOS and Linux:
 
 ```bash
 ./start.sh
 ```
 
+Windows:
+
+```powershell
+.\start.ps1
+```
+
 ### Build native bundles
+
+macOS and Linux:
 
 ```bash
 ./build.sh
 ```
 
-Generated artifacts are written to `orchestrator-desktop/src-tauri/target/release/bundle/`.
+Windows:
 
-For manual build steps and troubleshooting, see [`BUILD.md`](./BUILD.md).
+```powershell
+.\build.ps1
+```
 
-## Data Persistence
+Generated bundles:
 
-The application stores its state in the operating system data directory.
+```text
+orchestrator-desktop/src-tauri/target/release/bundle/
+```
 
-### Stored files
+### Development notes
 
-| File | Purpose |
-| --- | --- |
-| `workspace.json` | Imported roots, services, containers, removed services |
-| `runtime.json` | Process state, status, and timestamps |
+- `start.sh` and `build.sh` now bootstrap local Java, Maven, and Node on macOS and Linux when needed.
+- `start.ps1` and `build.ps1` do the same on Windows.
+- Linux desktop builds still need Tauri native packages for the distro.
+- Manual build details remain in [`BUILD.md`](./BUILD.md).
 
-### Default locations
+Official Tauri prerequisites:
+
+[`v2.tauri.app/start/prerequisites`](https://v2.tauri.app/start/prerequisites/)
+
+## Data Location
 
 | Platform | Path |
 | --- | --- |
@@ -313,4 +193,4 @@ The application stores its state in the operating system data directory.
 
 ## License
 
-This project is available under the terms described in [`LICENSE`](./LICENSE).
+This project is available under [`LICENSE`](./LICENSE).

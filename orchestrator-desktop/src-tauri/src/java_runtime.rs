@@ -2,6 +2,7 @@ use crate::java_env::{
   apply_no_window, is_probable_windows_store_stub_path, java_version_requirement_error, parse_java_major_from_version_output,
   prepend_java_home_bin, MINIMUM_JAVA_MAJOR,
 };
+use crate::windows_local_deps::local_java_home;
 use dunce::simplified;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -208,7 +209,13 @@ fn java_command_name() -> &'static str {
 
 fn prepare_java_launch(app: &tauri::AppHandle) -> Result<(OsString, OsString, Option<PathBuf>), String> {
   let mut path_entries = current_path_entries();
-  let runtime = configured_java_runtime(app)?;
+  let runtime = configured_java_runtime(app)?.or_else(|| {
+    local_java_home().map(|java_home| ResolvedJavaRuntime {
+      command: java_home.join("bin").join(java_command_name()),
+      bin_dir: java_home.join("bin"),
+      java_home,
+    })
+  });
   let command = runtime
     .as_ref()
     .map(|value| value.command.clone().into_os_string())

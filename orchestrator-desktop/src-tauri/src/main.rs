@@ -3,6 +3,7 @@
 mod core_bridge;
 mod java_env;
 mod java_runtime;
+mod windows_local_deps;
 
 use core_bridge::CoreBridge;
 use java_runtime::{read_runtime_settings, validate_java_runtime_path, write_runtime_settings, RuntimeSettings};

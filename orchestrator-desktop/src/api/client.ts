@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ContainerDto, JdkInfo, RuntimeSettingsDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
+import type { ContainerDto, JdkInfo, RuntimeSettingsDto, ServiceBranchMapDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
 
 type CoreJob<T> = () => Promise<T>;
 
@@ -44,6 +44,7 @@ export const api = {
   importRootsAndScan: (roots: string[]) => core<ServiceDto[]>("importRootsAndScan", { roots }),
   scanRoots: () => core<ServiceDto[]>("scanRoots"),
   listServices: () => core<ServiceDto[]>("listServices"),
+  listServiceBranches: () => core<ServiceBranchMapDto>("listServiceBranches"),
 
   start: (name: string) => core<ServiceDto>("startService", { name }),
   stop: (name: string) => core<StopResultDto>("stopService", { name }),
@@ -76,6 +77,7 @@ export const api = {
   setServiceJavaVersion: (name: string, javaVersion: string | null) => core<ServiceDto[]>("setServiceJavaVersion", { name, javaVersion }),
   setServiceScript: (name: string, script: string) => core<ServiceDto[]>("setServiceScript", { name, script }),
   setServicePort: (name: string, port: number) => core<ServiceDto[]>("setServicePort", { name, port }),
+  resetServicePort: (name: string) => core<ServiceDto[]>("resetServicePort", { name }),
   checkPortFree: (port: number) => core<{ free: boolean }>("checkPortFree", { port }),
   killPort: (port: number) => core<{ ok: boolean; message: string }>("killPort", { port }),
 

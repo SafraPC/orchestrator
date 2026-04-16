@@ -2,6 +2,7 @@ package dev.safra.orchestrator.core.runtime;
 
 import java.io.RandomAccessFile;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -162,7 +163,7 @@ public class LogSubscription {
       raf.readFully(bytes);
       pos.set(len);
 
-      String chunk = new String(bytes, LOG_CHARSET);
+      String chunk = decode(bytes);
       String combined = carry.get() + chunk;
       String[] split = combined.split("\\R", -1);
 
@@ -203,7 +204,7 @@ public class LogSubscription {
         raf.seek(start);
         byte[] bytes = new byte[(int) (len - start)];
         raf.readFully(bytes);
-        String txt = new String(bytes, LOG_CHARSET);
+        String txt = decode(bytes);
         String[] split = txt.split("\\R");
         List<String> out = new ArrayList<>();
         for (String s : split)
@@ -216,5 +217,13 @@ public class LogSubscription {
     } catch (Exception e) {
       return List.of("[logTail] erro ao ler últimas linhas: " + e.getMessage());
     }
+  }
+
+  private static String decode(byte[] bytes) {
+    String utf8 = new String(bytes, StandardCharsets.UTF_8);
+    if (!utf8.contains("\uFFFD")) {
+      return utf8;
+    }
+    return new String(bytes, LOG_CHARSET);
   }
 }

@@ -8,6 +8,10 @@ export type ServiceDto = {
   command: string[];
   logFile: string;
   env?: Record<string, string>;
+  detectedPort?: number | null;
+  customPort?: number | null;
+  portStrategy?: string | null;
+  currentBranch?: string | null;
   javaHome?: string;
   javaVersion?: string;
   containerIds?: string[];
@@ -49,3 +53,5 @@ export type JdkInfo = {
 export type RuntimeSettingsDto = {
   javaPath?: string | null;
 };
+
+export type ServiceBranchMapDto = Record<string, string | null>;

@@ -59,6 +59,7 @@ public final class WorkspaceDefinitionSync {
       }
       ProjectType pt = def.getProjectType();
       if (pt != null && pt != ProjectType.SPRING_BOOT) {
+        def.setCustomPort(prev.getCustomPort());
         if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
           String preferred = prev.getSelectedScript();
           String runtimeScript = selectRuntimeJsScript(preferred, def.getAvailableScripts());
@@ -95,39 +96,5 @@ public final class WorkspaceDefinitionSync {
       if (!NON_RUNTIME_JS_SCRIPTS.contains(script.toLowerCase())) return script;
     }
     return available.get(0);
-  }
-
-  public static void applyJsPort(ServiceDefinition def, int port) {
-    if (def.getEnv() == null) {
-      def.setEnv(new HashMap<>());
-    }
-    String value = String.valueOf(port);
-    def.getEnv().put("SERVER_PORT", value);
-    def.getEnv().put("PORT", value);
-    List<String> cmd = def.getCommand();
-    if (cmd == null || cmd.isEmpty()) return;
-    List<String> updated = new ArrayList<>(cmd);
-    boolean changed = false;
-    for (int i = 0; i < updated.size(); i++) {
-      String token = updated.get(i);
-      if ("--port".equalsIgnoreCase(token) || "-p".equalsIgnoreCase(token)) {
-        if (i + 1 < updated.size()) {
-          updated.set(i + 1, value);
-          changed = true;
-        }
-      } else if (token.startsWith("--port=") || token.startsWith("--PORT=")) {
-        int idx = token.indexOf('=');
-        updated.set(i, token.substring(0, idx + 1) + value);
-        changed = true;
-      }
-    }
-    if (!changed && updated.size() >= 2 && "npm".equalsIgnoreCase(updated.get(0)) && "run".equalsIgnoreCase(updated.get(1))) {
-      updated.add("--");
-      updated.add("--port");
-      updated.add(value);
-      updated.add("--strictPort");
-      changed = true;
-    }
-    if (changed) def.setCommand(updated);
   }
 }

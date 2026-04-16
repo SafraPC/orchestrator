@@ -30,6 +30,7 @@ public class CoreRuntime {
   private final LogManager logManager;
   private final ExternalToolLauncher launcher;
   private final ProcessManager processManager;
+  private final GitBranchResolver gitBranchResolver;
 
   public CoreRuntime(Path stateDir, ObjectMapper om, TriEventEmitter eventEmitter) {
     this.om = om;
@@ -42,6 +43,7 @@ public class CoreRuntime {
     this.logManager = new LogManager(om, emitEvent, shutdown);
     this.workspaceManager = new WorkspaceManager(stateDir, om, store, portExtractor, emitEvent, services);
     this.launcher = new ExternalToolLauncher();
+    this.gitBranchResolver = new GitBranchResolver();
 
     LogFileWriter.initialize(stateDir);
     workspaceManager.loadAll();
@@ -83,7 +85,11 @@ public class CoreRuntime {
       case "removeRoot" -> workspaceManager.removeRoot(
           params != null && params.hasNonNull("root") ? params.get("root").asText() : null);
       case "scanRoots" -> workspaceManager.scanRoots();
-      case "listServices" -> serviceManager.list();
+      case "listServices" -> {
+        workspaceManager.refreshDynamicJsMetadata();
+        yield serviceManager.list();
+      }
+      case "listServiceBranches" -> om.valueToTree(gitBranchResolver.list(services));
       case "startService" -> serviceManager.start(reqName(params));
       case "stopService" -> serviceManager.stop(reqName(params));
       case "restartService" -> serviceManager.restart(reqName(params));
@@ -183,6 +189,7 @@ public class CoreRuntime {
             def.setCommand(List.of("npm", "run", selected));
           }
         }
+        workspaceManager.refreshDynamicJsMetadata(def);
         workspaceManager.persistWorkspace();
         if (wasRunning) serviceManager.start(name);
         emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
@@ -197,14 +204,36 @@ public class CoreRuntime {
         if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
           throw new IllegalArgumentException("Troca de porta suportada apenas para projetos frontend");
         }
+        workspaceManager.refreshDynamicJsMetadata(def);
+        if (!"CLI".equalsIgnoreCase(def.getPortStrategy())) {
+          throw new IllegalArgumentException("Este script não permite troca de porta com segurança.");
+        }
         boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
         if (wasRunning) serviceManager.stop(name);
-        if (!dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port)) {
+        Integer detectedPort = def.getDetectedPort();
+        boolean usesCustomPort = detectedPort == null || detectedPort != port;
+        if (usesCustomPort && !dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port)) {
           throw new IllegalStateException("Porta " + port + " está em uso. Libere a porta antes de aplicar.");
         }
-        WorkspaceDefinitionSync.applyJsPort(def, port);
+        def.setCustomPort(usesCustomPort ? port : null);
         workspaceManager.persistWorkspace();
-        serviceManager.start(name);
+        if (wasRunning) serviceManager.start(name);
+        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
+        yield serviceManager.list();
+      }
+      case "resetServicePort" -> {
+        String name = reqName(params);
+        ServiceDescriptor sd = serviceManager.requireService(name);
+        ServiceDefinition def = sd.getDefinition();
+        if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
+          throw new IllegalArgumentException("Reset de porta suportado apenas para projetos frontend");
+        }
+        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
+        if (wasRunning) serviceManager.stop(name);
+        def.setCustomPort(null);
+        workspaceManager.persistWorkspace();
+        if (wasRunning) serviceManager.start(name);
+        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
         yield serviceManager.list();
       }
       case "setServiceJavaVersion" -> {

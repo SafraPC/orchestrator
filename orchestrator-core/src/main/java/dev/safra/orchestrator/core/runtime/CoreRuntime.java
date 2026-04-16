@@ -174,6 +174,8 @@ public class CoreRuntime {
         String script = params != null && params.hasNonNull("script") ? params.get("script").asText() : null;
         ServiceDescriptor sd = serviceManager.requireService(name);
         ServiceDefinition def = sd.getDefinition();
+        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
+        if (wasRunning) serviceManager.stop(name);
         if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
           String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(script, def.getAvailableScripts());
           if (selected != null) {
@@ -182,6 +184,7 @@ public class CoreRuntime {
           }
         }
         workspaceManager.persistWorkspace();
+        if (wasRunning) serviceManager.start(name);
         emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
         yield serviceManager.list();
       }
@@ -194,15 +197,22 @@ public class CoreRuntime {
         if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
           throw new IllegalArgumentException("Troca de porta suportada apenas para projetos frontend");
         }
+        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
+        if (wasRunning) serviceManager.stop(name);
+        if (!dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port)) {
+          throw new IllegalStateException("Porta " + port + " está em uso. Libere a porta antes de aplicar.");
+        }
         WorkspaceDefinitionSync.applyJsPort(def, port);
         workspaceManager.persistWorkspace();
-        serviceManager.restart(name);
+        serviceManager.start(name);
         yield serviceManager.list();
       }
       case "setServiceJavaVersion" -> {
         String name = reqName(params);
         String version = params != null && params.hasNonNull("javaVersion") ? params.get("javaVersion").asText() : null;
         ServiceDescriptor sd = serviceManager.requireService(name);
+        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
+        if (wasRunning) serviceManager.stop(name);
         sd.getDefinition().setJavaVersion(version);
         sd.getDefinition().setJavaHome(null);
         if (version != null && !version.isBlank()) {
@@ -211,8 +221,22 @@ public class CoreRuntime {
         }
         workspaceManager.persistWorkspace();
         workspaceManager.persistRuntime();
+        if (wasRunning) serviceManager.start(name);
         emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
         yield serviceManager.list();
+      }
+      case "checkPortFree" -> {
+        int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;
+        if (port < 1 || port > 65535) throw new IllegalArgumentException("params.port inválida");
+        boolean free = dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port);
+        yield om.getNodeFactory().objectNode().put("free", free);
+      }
+      case "killPort" -> {
+        int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;
+        if (port < 1 || port > 65535) throw new IllegalArgumentException("params.port inválida");
+        boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
+        dev.safra.orchestrator.process.PortProcessKiller.killPort(port, windows);
+        yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Porta " + port + " liberada");
       }
       default -> throw new IllegalArgumentException("Método desconhecido: " + method);
     };

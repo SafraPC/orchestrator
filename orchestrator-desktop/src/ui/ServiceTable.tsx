@@ -241,6 +241,7 @@ export function ServiceTable(props: {
         open={!!portTarget}
         serviceName={portTarget?.name ?? null}
         currentPort={portTarget?.port}
+        allServices={allSvcs}
         onCancel={() => setPortTarget(null)}
         onConfirm={async (name, port) => {
           try {

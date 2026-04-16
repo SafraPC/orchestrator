@@ -70,6 +70,7 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 - addServiceToContainer, removeServiceFromContainer, getServicesByContainer
 - startContainer, stopContainer
 - openServiceFolder, openServiceTerminal, openServiceInEditor
+- checkPortFree, killPort
 
 ### Persistence
 - `workspace.json` — roots, services, containers, removedServices (exclusion set)

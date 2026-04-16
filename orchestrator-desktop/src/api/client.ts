@@ -76,6 +76,8 @@ export const api = {
   setServiceJavaVersion: (name: string, javaVersion: string | null) => core<ServiceDto[]>("setServiceJavaVersion", { name, javaVersion }),
   setServiceScript: (name: string, script: string) => core<ServiceDto[]>("setServiceScript", { name, script }),
   setServicePort: (name: string, port: number) => core<ServiceDto[]>("setServicePort", { name, port }),
+  checkPortFree: (port: number) => core<{ free: boolean }>("checkPortFree", { port }),
+  killPort: (port: number) => core<{ ok: boolean; message: string }>("killPort", { port }),
 
   reorderServices: (order: string[]) => core<void>("reorderServices", { order }),
   reorderContainers: (order: string[]) => core<void>("reorderContainers", { order }),

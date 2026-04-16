@@ -27,7 +27,7 @@ function isJavaStartupError(message: string) {
   return /java/i.test(message);
 }
 
-export function App() {
+export function App(props: { onReady?: () => void }) {
   const [services, setServices] = useState<ServiceDto[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedContainer, setSelectedContainer] = useState<string | null>(null);
@@ -99,6 +99,10 @@ export function App() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!loading) props.onReady?.();
+  }, [loading, props.onReady]);
 
   useEffect(() => {
     if (!loading) return;
@@ -258,6 +262,7 @@ export function App() {
         if (ok) {
           await refreshJdks();
           addToast("success", next.javaPath ? "Java configurado" : "Configuração do Java removida");
+          setSettingsOpen(false);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

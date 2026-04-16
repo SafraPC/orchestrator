@@ -5,8 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/lemain-icon.png" />
     <title>Orchestrator</title>
+    <style>
+      #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#05070A;transition:opacity .4s ease-out}
+      #splash.hide{opacity:0;pointer-events:none}
+      #splash img{width:56px;height:56px;border-radius:14px;border:1px solid rgba(255,122,0,0.27);box-shadow:0 0 24px rgba(255,122,0,0.18);animation:splashPulse 1.8s ease-in-out infinite}
+      #splash .bar{margin-top:24px;width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden}
+      #splash .bar::after{content:'';display:block;width:40%;height:100%;border-radius:3px;background:linear-gradient(90deg,transparent,#17E28B,transparent);animation:splashSlide 1.2s ease-in-out infinite}
+      @keyframes splashPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.96)}}
+      @keyframes splashSlide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+    </style>
   </head>
   <body class="bg-surface-0 text-slate-300 font-sans">
+    <div id="splash">
+      <img src="/lemain-icon.png" alt="Orchestrator" />
+      <div class="bar"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

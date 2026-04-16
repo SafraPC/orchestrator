@@ -108,7 +108,7 @@ public class ProcessManager {
       return pid;
     } catch (IOException e) {
       String detail = e.getMessage() != null ? e.getMessage() : e.toString();
-      throw new IllegalStateException("Falha ao iniciar processo para servico: " + def.getName() + " - " + detail, e);
+      throw new IllegalStateException("Falha ao iniciar processo para serviço: " + def.getName() + " - " + detail, e);
     }
   }
 
@@ -126,18 +126,34 @@ public class ProcessManager {
       return StopResult.alreadyStopped(pid);
     }
 
-    boolean termSent = h.destroy(); // SIGTERM (Unix)
+    if (isWindows()) {
+      killWindowsTree(pid);
+      boolean exited = waitForExit(h, gracefulTimeout);
+      if (exited) return StopResult.stopped(pid, "TASKKILL_TREE");
+    }
+
+    boolean termSent = h.destroy();
     boolean exited = waitForExit(h, gracefulTimeout);
     if (exited) {
       return StopResult.stopped(pid, termSent ? "SIGTERM" : "TERM_NOT_SENT");
     }
 
-    boolean killSent = h.destroyForcibly(); // SIGKILL (Unix)
+    boolean killSent = h.destroyForcibly();
     boolean exitedAfterKill = waitForExit(h, killTimeout);
     if (exitedAfterKill) {
       return StopResult.stopped(pid, killSent ? "SIGKILL" : "KILL_NOT_SENT");
     }
     return StopResult.failed(pid, "Não foi possível finalizar o processo (TERM+KILL) dentro do timeout.");
+  }
+
+  private void killWindowsTree(long pid) {
+    try {
+      new ProcessBuilder("taskkill", "/PID", String.valueOf(pid), "/T", "/F")
+          .redirectErrorStream(true)
+          .start()
+          .waitFor(5, TimeUnit.SECONDS);
+    } catch (Exception ignored) {
+    }
   }
 
   private boolean waitForExit(ProcessHandle h, Duration timeout) {

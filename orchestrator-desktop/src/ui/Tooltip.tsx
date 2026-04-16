@@ -17,12 +17,19 @@ export function Tooltip(props: { text: string; delay?: number; children: React.R
     setVisible(false);
   }, []);
 
+  const [below, setBelow] = useState(false);
+
   useLayoutEffect(() => {
     if (!visible || !triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
-    const top = r.top - 6;
     const left = r.left + r.width / 2;
-    setPos({ top: Math.max(4, top), left });
+    const needsFlip = r.top < 32;
+    setBelow(needsFlip);
+    if (needsFlip) {
+      setPos({ top: r.bottom + 6, left });
+    } else {
+      setPos({ top: r.top - 6, left });
+    }
   }, [visible]);
 
   return (
@@ -30,8 +37,8 @@ export function Tooltip(props: { text: string; delay?: number; children: React.R
       {props.children}
       {visible && pos && createPortal(
         <span
-          className="fixed z-[999] whitespace-nowrap animate-fade-in pointer-events-none -translate-x-1/2"
-          style={{ top: pos.top, left: pos.left, transform: "translate(-50%, -100%)" }}
+          className="fixed z-[999] whitespace-nowrap animate-fade-in pointer-events-none"
+          style={{ top: pos.top, left: pos.left, transform: below ? "translate(-50%, 0)" : "translate(-50%, -100%)" }}
         >
           <span className="block rounded bg-surface-4 px-2 py-1 text-2xs text-slate-200 shadow-elevated border border-white/[0.08]">
             {props.text}

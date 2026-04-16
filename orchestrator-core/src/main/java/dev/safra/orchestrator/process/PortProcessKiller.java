@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-final class PortProcessKiller {
+public final class PortProcessKiller {
   private PortProcessKiller() {
   }
 
@@ -19,47 +19,76 @@ final class PortProcessKiller {
     try {
       int port = Integer.parseInt(portStr.trim());
       if (isPortFree(port)) return;
-      if (windows) {
-        killWindowsPort(port);
-      } else {
-        killUnixPort(port);
+      for (int attempt = 0; attempt < 2; attempt++) {
+        if (windows) {
+          killWindowsPort(port);
+        } else {
+          killUnixPort(port);
+        }
+        if (waitUntilPortFree(port, attempt == 0 ? 20 : 30)) return;
       }
-      waitUntilPortFree(port);
+      throw new IllegalStateException("Porta " + port + " continua em uso após tentativa de liberação.");
+    } catch (IllegalStateException e) {
+      throw e;
     } catch (Exception e) {
       throw new IllegalStateException("Falha ao liberar porta " + portStr + ": " + e.getMessage(), e);
     }
   }
 
   private static void killWindowsPort(int port) throws Exception {
-    Process netstat = new ProcessBuilder("cmd.exe", "/c", "netstat -ano -p tcp")
-        .redirectErrorStream(true)
-        .start();
-    String output = new String(netstat.getInputStream().readAllBytes());
-    netstat.waitFor(5, TimeUnit.SECONDS);
-    Set<String> pids = new HashSet<>();
-    for (String line : output.split("\\R")) {
-      String row = line.trim();
-      if (!row.startsWith("TCP")) continue;
-      String[] parts = row.split("\\s+");
-      if (parts.length < 5) continue;
-      String local = parts[1];
-      if (!local.endsWith(":" + port)) continue;
-      pids.add(parts[parts.length - 1]);
-    }
+    Set<String> pids = findPidsNetstat(port);
+    if (pids.isEmpty()) pids = findPidsPowerShell(port);
     for (String pid : pids) {
-      if (!pid.isBlank() && !"0".equals(pid)) {
-        new ProcessBuilder("taskkill", "/PID", pid, "/T", "/F")
-            .redirectErrorStream(true)
-            .start()
-            .waitFor(3, TimeUnit.SECONDS);
-      }
+      new ProcessBuilder("taskkill", "/PID", pid, "/T", "/F")
+          .redirectErrorStream(true)
+          .start()
+          .waitFor(5, TimeUnit.SECONDS);
     }
+  }
+
+  private static Set<String> findPidsNetstat(int port) {
+    Set<String> pids = new HashSet<>();
+    try {
+      Process netstat = new ProcessBuilder("cmd.exe", "/c", "netstat -ano -p tcp")
+          .redirectErrorStream(true).start();
+      String output = new String(netstat.getInputStream().readAllBytes());
+      netstat.waitFor(5, TimeUnit.SECONDS);
+      String suffix = ":" + port;
+      for (String line : output.split("\\R")) {
+        String row = line.trim();
+        if (!row.startsWith("TCP")) continue;
+        String[] parts = row.split("\\s+");
+        if (parts.length < 5) continue;
+        if (!parts[1].endsWith(suffix)) continue;
+        String pid = parts[parts.length - 1];
+        if (!pid.isBlank() && !"0".equals(pid)) pids.add(pid);
+      }
+    } catch (Exception ignored) {
+    }
+    return pids;
+  }
+
+  private static Set<String> findPidsPowerShell(int port) {
+    Set<String> pids = new HashSet<>();
+    try {
+      String cmd = "(Get-NetTCPConnection -LocalPort " + port
+          + " -ErrorAction SilentlyContinue).OwningProcess | Sort-Object -Unique";
+      Process ps = new ProcessBuilder("powershell", "-NoProfile", "-Command", cmd)
+          .redirectErrorStream(true).start();
+      String output = new String(ps.getInputStream().readAllBytes()).trim();
+      ps.waitFor(8, TimeUnit.SECONDS);
+      for (String line : output.split("\\R")) {
+        String pid = line.trim();
+        if (!pid.isEmpty() && pid.matches("\\d+") && !"0".equals(pid)) pids.add(pid);
+      }
+    } catch (Exception ignored) {
+    }
+    return pids;
   }
 
   private static void killUnixPort(int port) throws Exception {
     Process lsof = new ProcessBuilder("lsof", "-ti", ":" + port)
-        .redirectErrorStream(true)
-        .start();
+        .redirectErrorStream(true).start();
     String output = new String(lsof.getInputStream().readAllBytes()).trim();
     lsof.waitFor(5, TimeUnit.SECONDS);
     if (output.isEmpty()) return;
@@ -67,22 +96,39 @@ final class PortProcessKiller {
       String pid = pidLine.trim();
       if (!pid.isEmpty()) {
         new ProcessBuilder("kill", "-9", pid)
-            .redirectErrorStream(true)
-            .start()
-            .waitFor(3, TimeUnit.SECONDS);
+            .redirectErrorStream(true).start().waitFor(3, TimeUnit.SECONDS);
       }
     }
   }
 
-  private static void waitUntilPortFree(int port) throws Exception {
-    for (int i = 0; i < 15; i++) {
-      if (isPortFree(port)) return;
-      Thread.sleep(200);
+  private static boolean waitUntilPortFree(int port, int maxAttempts) throws InterruptedException {
+    for (int i = 0; i < maxAttempts; i++) {
+      Thread.sleep(300);
+      if (isPortFree(port)) return true;
     }
-    throw new IllegalStateException("Porta " + port + " continua em uso apos tentativa de liberacao.");
+    return false;
   }
 
-  private static boolean isPortFree(int port) {
+  public static void killPort(int port, boolean windows) {
+    if (isPortFree(port)) return;
+    try {
+      for (int attempt = 0; attempt < 2; attempt++) {
+        if (windows) {
+          killWindowsPort(port);
+        } else {
+          killUnixPort(port);
+        }
+        if (waitUntilPortFree(port, attempt == 0 ? 20 : 30)) return;
+      }
+      throw new IllegalStateException("Porta " + port + " continua em uso após tentativa de liberação.");
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("Falha ao liberar porta " + port + ": " + e.getMessage(), e);
+    }
+  }
+
+  public static boolean isPortFree(int port) {
     return canBind(port, null) && canBind(port, InetAddress.getLoopbackAddress());
   }
 

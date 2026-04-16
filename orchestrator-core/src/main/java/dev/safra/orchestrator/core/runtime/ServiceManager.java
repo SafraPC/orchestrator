@@ -67,7 +67,7 @@ public class ServiceManager {
       rt.setStatus(ServiceStatus.STOPPED);
     }
 
-    logManager.emitLogStatus(name, "Iniciando servico " + name + "...");
+    logManager.emitLogStatus(name, "Iniciando serviço " + name + "...");
 
     try {
       long pid = processManager.start(sd.getDefinition());
@@ -90,7 +90,7 @@ public class ServiceManager {
       logManager.emitLogStatus(name, "Erro ao iniciar: " + e.getMessage());
       persistRuntime.run();
       emitServiceChanged(name);
-      throw new IllegalStateException("Falha ao iniciar servico: " + name + " - " + e.getMessage(), e);
+      throw new IllegalStateException("Falha ao iniciar serviço: " + name + " - " + e.getMessage(), e);
     }
   }
 

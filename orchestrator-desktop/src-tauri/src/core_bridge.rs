@@ -87,7 +87,7 @@ fn start_reader_thread(app: tauri::AppHandle, stdout: std::process::ChildStdout,
       let v: Value = match serde_json::from_str(&line) {
         Ok(v) => v,
         Err(_) => {
-          tlog(&format!("linha nao-JSON do core stdout: {line}"));
+          tlog(&format!("linha não-JSON do core stdout: {line}"));
           continue;
         }
       };

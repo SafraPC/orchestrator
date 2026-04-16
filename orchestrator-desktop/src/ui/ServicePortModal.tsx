@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api/client";
+import type { ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
+
+type PortStatus = "idle" | "checking" | "free" | "blocked";
 
 type ServicePortModalProps = {
   open: boolean;
   serviceName: string | null;
   currentPort?: string;
+  allServices?: ServiceDto[];
   onCancel: () => void;
   onConfirm: (serviceName: string, port: number) => Promise<void>;
 };
@@ -12,10 +17,17 @@ type ServicePortModalProps = {
 export function ServicePortModal(props: ServicePortModalProps) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [portStatus, setPortStatus] = useState<PortStatus>("idle");
+  const [portMsg, setPortMsg] = useState<string | null>(null);
+  const checkTimer = useRef<ReturnType<typeof setTimeout>>();
+  const checkSeq = useRef(0);
 
   useEffect(() => {
     if (!props.open) return;
     setValue(props.currentPort ?? "");
+    setPortStatus("idle");
+    setPortMsg(null);
+    checkSeq.current++;
   }, [props.open, props.currentPort]);
 
   useEffect(() => {
@@ -27,11 +39,70 @@ export function ServicePortModal(props: ServicePortModalProps) {
     return () => window.removeEventListener("keydown", h);
   }, [props.open, busy, props.onCancel]);
 
+  const scheduleCheck = useCallback(
+    (port: number) => {
+      clearTimeout(checkTimer.current);
+
+      const otherService = props.allServices?.find(
+        (s) => s.name !== props.serviceName && (s.env?.SERVER_PORT === String(port) || s.env?.PORT === String(port)),
+      );
+      if (otherService) {
+        setPortStatus("blocked");
+        setPortMsg(`Porta ${port} já atribuída ao serviço "${otherService.name}".`);
+        return;
+      }
+
+      setPortStatus("checking");
+      setPortMsg(null);
+      const seq = ++checkSeq.current;
+
+      checkTimer.current = setTimeout(async () => {
+        try {
+          const { free } = await api.checkPortFree(port);
+          if (seq !== checkSeq.current) return;
+          if (!free) {
+            setPortStatus("blocked");
+            setPortMsg(`Porta ${port} está em uso por outro processo.`);
+          } else {
+            setPortStatus("free");
+            setPortMsg(null);
+          }
+        } catch {
+          if (seq !== checkSeq.current) return;
+          setPortStatus("free");
+          setPortMsg(null);
+        }
+      }, 350);
+    },
+    [props.allServices, props.serviceName],
+  );
+
+  useEffect(() => {
+    return () => clearTimeout(checkTimer.current);
+  }, []);
+
   const error = useMemo(() => {
     const port = Number(value.trim());
     if (!Number.isInteger(port) || port < 1 || port > 65535) return "Porta deve estar entre 1 e 65535.";
     return null;
   }, [value]);
+
+  useEffect(() => {
+    if (!props.open || error) {
+      setPortStatus("idle");
+      setPortMsg(null);
+      return;
+    }
+    const port = Number(value.trim());
+    if (String(port) === props.currentPort) {
+      setPortStatus("blocked");
+      setPortMsg("Esta já é a porta atual do serviço.");
+      return;
+    }
+    scheduleCheck(port);
+  }, [value, props.open, error, props.currentPort, scheduleCheck]);
+
+  const canApply = !busy && !error && portStatus === "free";
 
   if (!props.open || !props.serviceName) return null;
 
@@ -61,15 +132,27 @@ export function ServicePortModal(props: ServicePortModalProps) {
                 className="input w-full px-2 py-1.5 text-xs"
               />
               {error && <p className="text-2xs text-danger/90">{error}</p>}
+              {!error && portStatus === "checking" && (
+                <p className="text-2xs text-slate-500 flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full border border-slate-500 border-t-transparent animate-spin" />
+                  Verificando disponibilidade...
+                </p>
+              )}
+              {!error && portStatus === "blocked" && portMsg && (
+                <p className="text-2xs text-yellow-400/90">{portMsg}</p>
+              )}
+              {!error && portStatus === "free" && (
+                <p className="text-2xs text-accent/70">Porta disponível</p>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-white/[0.06]">
             <button className="btn btn-ghost text-xs" onClick={props.onCancel} disabled={busy}>Cancelar</button>
             <button
               className="btn btn-primary text-xs font-semibold disabled:opacity-50"
-              disabled={busy || !!error}
+              disabled={!canApply}
               onClick={async () => {
-                if (error || !props.serviceName) return;
+                if (!canApply || !props.serviceName) return;
                 setBusy(true);
                 try {
                   await props.onConfirm(props.serviceName, Number(value.trim()));

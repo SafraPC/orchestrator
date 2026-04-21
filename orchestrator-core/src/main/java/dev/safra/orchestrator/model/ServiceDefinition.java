@@ -21,4 +21,5 @@ public class ServiceDefinition {
   private ProjectType projectType;
   private List<String> availableScripts;
   private String selectedScript;
+  private Boolean useMvnWrapper;
 }

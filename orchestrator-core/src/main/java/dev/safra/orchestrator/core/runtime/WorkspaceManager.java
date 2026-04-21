@@ -204,6 +204,33 @@ public class WorkspaceManager {
     return buildSortedServiceList();
   }
 
+  public JsonNode rebuildServices() {
+    Map<String, List<String>> savedContainerIds = new HashMap<>();
+    for (ServiceDefinition def : workspace.getServices()) {
+      if (def.getContainerIds() != null && !def.getContainerIds().isEmpty()) {
+        savedContainerIds.put(def.getName(), new ArrayList<>(def.getContainerIds()));
+      }
+      def.setJavaHome(null);
+    }
+    services.clear();
+    Map<String, ServiceRuntime> empty = new HashMap<>();
+    store.writeJson(runtimeFile, empty);
+    persistWorkspace();
+    loadAll();
+    for (Map.Entry<String, List<String>> entry : savedContainerIds.entrySet()) {
+      ServiceDescriptor sd = services.get(entry.getKey());
+      if (sd == null) continue;
+      List<String> valid = entry.getValue().stream()
+          .filter(id -> workspace.getContainers().containsKey(id))
+          .toList();
+      sd.getDefinition().setContainerIds(new ArrayList<>(valid));
+    }
+    refreshDynamicJsMetadata();
+    persistWorkspace();
+    emitEvent.accept("workspace", om.valueToTree(workspace));
+    return buildSortedServiceList();
+  }
+
   public void refreshDynamicJsMetadata() {
     boolean changed = false;
     for (ServiceDescriptor descriptor : services.values()) changed |= refreshDynamicJsMetadata(descriptor.getDefinition());
@@ -236,6 +263,7 @@ public class WorkspaceManager {
     return new ServiceView(d.getName(), d.getPath(), d.getCommand(), d.getLogFile(),
         d.getEnv(), d.getDetectedPort(), d.getCustomPort(), d.getPortStrategy(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
         d.getProjectType(), d.getAvailableScripts(), d.getSelectedScript(),
+        MavenWrapperDetector.usesWrapper(d), MavenWrapperDetector.hasWrapper(d),
         r.getPid(), r.getStatus(), r.getLastStartAt(), r.getLastStopAt(), r.getLastError());
   }
 

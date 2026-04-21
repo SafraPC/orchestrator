@@ -18,6 +18,8 @@ export type ServiceDto = {
   projectType?: ProjectType;
   availableScripts?: string[];
   selectedScript?: string | null;
+  useMvnWrapper?: boolean | null;
+  hasMvnWrapper?: boolean | null;
   pid?: number | null;
   status: ServiceStatus;
   lastStartAt?: string | null;
@@ -52,6 +54,13 @@ export type JdkInfo = {
 
 export type RuntimeSettingsDto = {
   javaPath?: string | null;
+};
+
+export type ActiveJavaInfoDto = {
+  javaHome: string;
+  javaVersion: string;
+  vendor: string;
+  runtimeName: string;
 };
 
 export type ServiceBranchMapDto = Record<string, string | null>;

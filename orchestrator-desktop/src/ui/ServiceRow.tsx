@@ -43,6 +43,7 @@ export function ServiceRow(props: {
   onSetScript: (name: string, script: string) => Promise<void>;
   onSetPort: (service: ServiceDto) => void;
   onResetPort: (name: string) => Promise<void>;
+  onSetMvnWrapper: (name: string, enabled: boolean) => Promise<void>;
   onStart: () => Promise<void>;
   onStop: () => Promise<void>;
   onRestart: () => Promise<void>;
@@ -86,6 +87,7 @@ export function ServiceRow(props: {
         </span>
         <span className={`truncate text-xs font-medium ${sel ? "text-slate-100" : "text-slate-200"}`}>{s.name}</span>
         <TechBadge projectType={s.projectType} javaVersion={s.javaVersion} />
+        {s.useMvnWrapper && s.hasMvnWrapper && <MvnWrapperBadge />}
         <div className="ml-auto flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           {!isRunning && (
             <Tooltip text="Iniciar">
@@ -124,6 +126,7 @@ export function ServiceRow(props: {
                 onSetJava={props.onSetJava}
                 onSetScript={props.onSetScript}
                 onSetPort={() => props.onSetPort(s)}
+                onSetMvnWrapper={props.onSetMvnWrapper}
               />
             )}
           </div>
@@ -205,6 +208,16 @@ function ActionBtn(props: {
     >
       <Ic className="h-3 w-3" />
     </button>
+  );
+}
+
+function MvnWrapperBadge() {
+  return (
+    <Tooltip text="Usando wrapper Maven do projeto (mvnw / mvnw.cmd). Altere no menu (3 pontos) se preferir o Maven do sistema.">
+      <span className="shrink-0 inline-flex items-center gap-0.5 rounded bg-amber-500/10 px-1 py-px text-[9px] font-mono font-semibold leading-none text-amber-400 border border-amber-500/30">
+        mvnw
+      </span>
+    </Tooltip>
   );
 }
 

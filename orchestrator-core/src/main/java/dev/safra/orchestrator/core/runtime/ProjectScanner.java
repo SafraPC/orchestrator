@@ -77,6 +77,7 @@ public class ProjectScanner {
           def.setJavaVersion(extractJavaVersion(file));
 
           String mvnCmd = hasMvnw ? "./mvnw" : "mvn";
+          def.setUseMvnWrapper(hasMvnw ? Boolean.TRUE : Boolean.FALSE);
           def.setCommand(List.of(mvnCmd, "-q", "-DskipTests",
               "-Dspring-boot.run.arguments=--server.port=" + port, "spring-boot:run"));
           out.add(def);

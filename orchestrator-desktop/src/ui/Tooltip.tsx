@@ -22,7 +22,13 @@ export function Tooltip(props: { text: string; delay?: number; children: React.R
   useLayoutEffect(() => {
     if (!visible || !triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
-    const left = r.left + r.width / 2;
+    const margin = 8;
+    const estimatedWidth = Math.min(props.text.length * 7 + 24, 280);
+    const half = estimatedWidth / 2;
+    const center = r.left + r.width / 2;
+    const minLeft = margin + half;
+    const maxLeft = window.innerWidth - margin - half;
+    const left = Math.max(minLeft, Math.min(maxLeft, center));
     const needsFlip = r.top < 32;
     setBelow(needsFlip);
     if (needsFlip) {
@@ -30,7 +36,7 @@ export function Tooltip(props: { text: string; delay?: number; children: React.R
     } else {
       setPos({ top: r.top - 6, left });
     }
-  }, [visible]);
+  }, [visible, props.text]);
 
   return (
     <span ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
@@ -38,7 +44,7 @@ export function Tooltip(props: { text: string; delay?: number; children: React.R
       {visible && pos && createPortal(
         <span
           className="fixed z-[999] whitespace-nowrap animate-fade-in pointer-events-none"
-          style={{ top: pos.top, left: pos.left, transform: below ? "translate(-50%, 0)" : "translate(-50%, -100%)" }}
+          style={{ top: pos.top, left: pos.left, transform: below ? "translate(-50%, 0)" : "translate(-50%, -100%)", maxWidth: "280px" }}
         >
           <span className="block rounded bg-surface-4 px-2 py-1 text-2xs text-slate-200 shadow-elevated border border-white/[0.08]">
             {props.text}

@@ -174,6 +174,16 @@ export function ServiceTable(props: {
             });
           }}
           onResetPort={resetPort}
+          onSetMvnWrapper={async (name, enabled) => {
+            setMenuOpen(null);
+            try {
+              const updated = await api.setServiceMvnWrapper(name, enabled);
+              props.onServicesUpdate?.(updated);
+              props.onToast?.("success", enabled ? `Wrapper Maven ativado em ${name}` : `Wrapper Maven desativado em ${name}`);
+            } catch (error) {
+              props.onToast?.("error", String(error));
+            }
+          }}
           onStart={async () => {
             setBusy(service.name);
             try {

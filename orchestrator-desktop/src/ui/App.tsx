@@ -1,29 +1,34 @@
-import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { ContainerDto, JdkInfo, ProjectType, RuntimeSettingsDto, ServiceDto } from "../api/types";
+import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
 import { ContainersPanel } from "./ContainersPanel";
+import { ContainerTabs } from "./ContainerTabs";
+import { Dropdown, type DropdownOption } from "./Dropdown";
 import { Icon } from "./Icons";
 import { ImportSection } from "./ImportSection";
+import { KillPortModal } from "./KillPortModal";
 import { LogsPanel } from "./LogsPanel";
+import { ResizeHandle } from "./ResizeHandle";
 import { ServiceTable } from "./ServiceTable";
 import { SettingsPanel, useSettings } from "./SettingsPanel";
 import { StatusBar } from "./StatusBar";
 import { Toast, useToast } from "./Toast";
+import { Toolbar } from "./Toolbar";
 import { Tooltip } from "./Tooltip";
 import { preserveCurrentBranches } from "./serviceMeta";
+import { useCoreEvents } from "./useCoreEvents";
+import { useJavaRuntime } from "./useJavaRuntime";
 import { useServiceBranchPolling } from "./useServiceBranchPolling";
+import { useServiceShortcuts } from "./useServiceShortcuts";
 
-type CoreEvent = { event: string; payload: unknown };
-
-const TECH_LABELS: Record<string, string> = {
-  SPRING_BOOT: "Spring",
-  NEXT: "Next",
-  NEST: "Nest",
-  REACT: "React",
-  VUE: "Vue",
-  UNKNOWN: "Outro",
-};
+const TECH_OPTIONS: DropdownOption<ProjectType>[] = [
+  { value: "SPRING_BOOT", label: "Spring", icon: "Java", iconClassName: "text-orange-400" },
+  { value: "NEXT", label: "Next", icon: "Next", iconClassName: "text-white" },
+  { value: "NEST", label: "Nest", icon: "Nest", iconClassName: "text-red-400" },
+  { value: "REACT", label: "React", icon: "ReactIcon", iconClassName: "text-cyan-400" },
+  { value: "VUE", label: "Vue", icon: "Vue", iconClassName: "text-emerald-400" },
+  { value: "UNKNOWN", label: "Outro", icon: "Box", iconClassName: "text-slate-400" },
+];
 
 function isJavaStartupError(message: string) {
   return /java/i.test(message);
@@ -39,27 +44,24 @@ export function App(props: { onReady?: () => void }) {
   const [containers, setContainers] = useState<ContainerDto[]>([]);
   const [jdks, setJdks] = useState<JdkInfo[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsDto>({});
-  const [javaError, setJavaError] = useState<string | null>(null);
-  const [savingJavaPath, setSavingJavaPath] = useState(false);
+  const [killPortOpen, setKillPortOpen] = useState(false);
   const [sideW, setSideW] = useState(288);
   const [svcW, setSvcW] = useState(288);
+  const [loading, setLoading] = useState(true);
+
   const { toasts, addToast, removeToast } = useToast();
   const { settings, setSettings } = useSettings();
-  const workspaceRefreshT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const java = useJavaRuntime();
+  const { setJavaError } = java;
 
-  const [loading, setLoading] = useState(true);
-  const selectedService = useMemo(() => services.find((s) => s.name === selected) ?? null, [services, selected]);
+  const selectedService = useMemo(
+    () => services.find((s) => s.name === selected) ?? null,
+    [services, selected],
+  );
 
   const refreshJdks = useCallback(async () => {
     try {
       setJdks(await api.listJdks());
-    } catch {}
-  }, []);
-
-  const loadRuntimeSettings = useCallback(async () => {
-    try {
-      setRuntimeSettings(await api.getRuntimeSettings());
     } catch {}
   }, []);
 
@@ -68,9 +70,9 @@ export function App(props: { onReady?: () => void }) {
     try {
       const packed = await Promise.race([
         Promise.all([api.listServices(), api.listContainers()]),
-        new Promise<never>((_, rej) => {
+        new Promise<never>((_, reject) => {
           setTimeout(
-            () => rej(new Error(`Timeout de ${BOOTSTRAP_MS / 1000}s ao falar com o core.`)),
+            () => reject(new Error(`Timeout de ${BOOTSTRAP_MS / 1000}s ao falar com o core.`)),
             BOOTSTRAP_MS,
           );
         }),
@@ -92,7 +94,7 @@ export function App(props: { onReady?: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, setJavaError]);
 
   const refresh = useCallback(async () => {
     await refreshData();
@@ -100,9 +102,18 @@ export function App(props: { onReady?: () => void }) {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useServiceBranchPolling(services, setServices);
+  useCoreEvents({ refresh, setServices });
+  useServiceShortcuts({
+    selected,
+    services,
+    refresh,
+    addToast,
+    toggleSettings: () => setSettingsOpen((value) => !value),
+  });
 
   useEffect(() => {
     if (!loading) props.onReady?.();
@@ -122,83 +133,10 @@ export function App(props: { onReady?: () => void }) {
   }, [refreshJdks]);
 
   useEffect(() => {
-    void loadRuntimeSettings();
-  }, [loadRuntimeSettings]);
-
-  useEffect(() => {
-    let cancel = false;
-    const scheduleWorkspaceRefresh = () => {
-      if (workspaceRefreshT.current) clearTimeout(workspaceRefreshT.current);
-      workspaceRefreshT.current = setTimeout(() => {
-        workspaceRefreshT.current = null;
-        if (!cancel) void refresh();
-      }, 400);
-    };
-    const promise = listen<CoreEvent>("core_event", (e) => {
-      if (cancel) return;
-      const raw = e.payload as Record<string, unknown> | null;
-      if (!raw || typeof raw !== "object") return;
-      const ev = raw.event;
-      const payload = raw.payload;
-      if (ev === "service" && payload) {
-        const svc = payload as ServiceDto;
-        setServices((prev) => prev.map((s) => (s.name === svc.name ? svc : s)));
-      } else if (ev === "services" && payload) {
-        setServices(payload as ServiceDto[]);
-      } else if (ev === "log") {
-        return;
-      } else if (ev === "workspace") {
-        scheduleWorkspaceRefresh();
-      }
-    });
-    return () => {
-      cancel = true;
-      if (workspaceRefreshT.current) clearTimeout(workspaceRefreshT.current);
-      void promise.then((u) => u());
-    };
-  }, [refresh]);
-
-  useEffect(() => {
     const block = (e: MouseEvent) => e.preventDefault();
     document.addEventListener("contextmenu", block);
     return () => document.removeEventListener("contextmenu", block);
   }, []);
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen((v) => !v);
-        return;
-      }
-      if (!selected) return;
-      const s = services.find((sv) => sv.name === selected);
-      if (!s) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        if (s.status !== "RUNNING") {
-          void api.start(s.name).then(() => refresh());
-          addToast("info", `Iniciando ${s.name}`);
-        }
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "x") {
-        e.preventDefault();
-        if (s.status === "RUNNING") {
-          void api.stop(s.name).then(() => refresh());
-          addToast("info", `Parando ${s.name}`);
-        }
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "r" && !e.shiftKey) {
-        e.preventDefault();
-        if (s.status === "RUNNING") {
-          void api.restart(s.name).then(() => refresh());
-          addToast("info", `Reiniciando ${s.name}`);
-        }
-      }
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [selected, services, refresh, addToast]);
 
   const handleServicesReorder = useCallback((reorderedSubset: ServiceDto[]) => {
     setServices((prev) => {
@@ -210,8 +148,8 @@ export function App(props: { onReady?: () => void }) {
       for (const s of prev) {
         if (subNames.has(s.name)) {
           if (subIdx < reorderedSubset.length) merged.push(reorderedSubset[subIdx++]);
-        } else {
-          if (otherIdx < others.length) merged.push(others[otherIdx++]);
+        } else if (otherIdx < others.length) {
+          merged.push(others[otherIdx++]);
         }
       }
       while (subIdx < reorderedSubset.length) merged.push(reorderedSubset[subIdx++]);
@@ -244,55 +182,60 @@ export function App(props: { onReady?: () => void }) {
     [services, refresh],
   );
 
-  const handlePickJavaFolder = useCallback(async () => {
-    const picked = await api.selectJavaFolder();
-    if (!picked?.trim()) return;
-    setRuntimeSettings((prev) => ({ ...prev, javaPath: picked.trim() }));
-  }, []);
-
-  const handlePickJavaFile = useCallback(async () => {
-    const picked = await api.selectJavaFile();
-    if (!picked?.trim()) return;
-    setRuntimeSettings((prev) => ({ ...prev, javaPath: picked.trim() }));
-  }, []);
-
   const handleSaveJavaPath = useCallback(
     async (value: string | null) => {
-      setSavingJavaPath(true);
       try {
-        const next = await api.setJavaRuntimePath(value);
-        setRuntimeSettings(next);
-        const ok = await refreshData();
+        const ok = await java.save(value, refreshData);
         if (ok) {
           await refreshJdks();
-          addToast("success", next.javaPath ? "Java configurado" : "Configuração do Java removida");
+          addToast("success", value ? "Java configurado" : "Configuração do Java removida");
           setSettingsOpen(false);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        setJavaError(message);
         setSettingsOpen(true);
         addToast("error", message);
-      } finally {
-        setSavingJavaPath(false);
       }
     },
-    [addToast, refreshData, refreshJdks],
+    [addToast, java, refreshData, refreshJdks],
   );
 
-  const filteredServices = useMemo(() => {
-    let f = selectedContainer ? containerServices : services;
-    if (techFilter) f = f.filter((s) => (s.projectType ?? "SPRING_BOOT") === techFilter);
-    if (filterText) {
-      const t = filterText.toLowerCase();
-      f = f.filter((s) => s.name.toLowerCase().includes(t) || s.path.toLowerCase().includes(t));
+  const handleRebuildServices = useCallback(async () => {
+    try {
+      const list = await api.rebuildServices();
+      setServices((prev) => preserveCurrentBranches(list, prev));
+      addToast("success", "Cache limpo e serviços recriados.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addToast("error", message);
+      throw error;
     }
-    return f;
+  }, [addToast]);
+
+  const filteredServices = useMemo(() => {
+    let result = selectedContainer ? containerServices : services;
+    if (techFilter) result = result.filter((s) => (s.projectType ?? "SPRING_BOOT") === techFilter);
+    if (filterText) {
+      const term = filterText.toLowerCase();
+      result = result.filter((s) => s.name.toLowerCase().includes(term) || s.path.toLowerCase().includes(term));
+    }
+    return result;
   }, [services, containerServices, selectedContainer, filterText, techFilter]);
+
+  const techDropdownOptions = useMemo<DropdownOption<ProjectType | "">[]>(
+    () => [
+      { value: "", label: "Todos", icon: "Scan", iconClassName: "text-accent" },
+      ...TECH_OPTIONS.filter((t) => availableTechs.includes(t.value)),
+    ],
+    [availableTechs],
+  );
 
   return (
     <div className="flex h-screen flex-col bg-surface-0 overflow-hidden">
-      <Toolbar onSettings={() => setSettingsOpen(true)} />
+      <Toolbar
+        onSettings={() => setSettingsOpen(true)}
+        onKillPort={() => setKillPortOpen(true)}
+      />
       <main className="flex flex-1 min-h-0">
         <aside
           className="shrink-0 border-r border-white/[0.04]"
@@ -303,20 +246,31 @@ export function App(props: { onReady?: () => void }) {
         >
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.04]">
             <span
-              className={`text-2xs font-semibold uppercase tracking-widest text-slate-600 transition-opacity ${containersCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"}`}
+              className={`text-2xs font-semibold uppercase tracking-widest text-slate-600 transition-opacity ${
+                containersCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+              }`}
             >
               Containers
             </span>
             <Tooltip text={containersCollapsed ? "Expandir" : "Recolher"}>
-              <button className="btn-ghost rounded p-1" onClick={() => setContainersCollapsed(!containersCollapsed)}>
+              <button
+                className="btn-ghost rounded p-1"
+                onClick={() => setContainersCollapsed(!containersCollapsed)}
+              >
                 <Icon.Chevron
-                  className={`h-3 w-3 text-slate-600 transition-transform duration-200 ${containersCollapsed ? "rotate-180" : ""}`}
+                  className={`h-3 w-3 text-slate-600 transition-transform duration-200 ${
+                    containersCollapsed ? "rotate-180" : ""
+                  }`}
                 />
               </button>
             </Tooltip>
           </div>
           <div
-            className={`transition-opacity duration-200 ${containersCollapsed ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100 h-[calc(100%-37px)]"}`}
+            className={`transition-opacity duration-200 ${
+              containersCollapsed
+                ? "opacity-0 pointer-events-none h-0 overflow-hidden"
+                : "opacity-100 h-[calc(100%-37px)]"
+            }`}
           >
             <ContainersPanel
               services={services}
@@ -352,18 +306,13 @@ export function App(props: { onReady?: () => void }) {
                 />
               </div>
               {availableTechs.length > 1 && (
-                <select
+                <Dropdown<ProjectType | "">
                   value={techFilter}
-                  onChange={(e) => setTechFilter(e.target.value as ProjectType | "")}
-                  className="input text-2xs px-1.5 py-1 w-auto shrink-0 cursor-pointer bg-surface-2 border-white/[0.06]"
-                >
-                  <option value="">Todos</option>
-                  {availableTechs.map((t) => (
-                    <option key={t} value={t}>
-                      {TECH_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setTechFilter}
+                  options={techDropdownOptions}
+                  placeholder="Filtrar"
+                  align="right"
+                />
               )}
             </div>
           </div>
@@ -402,17 +351,23 @@ export function App(props: { onReady?: () => void }) {
         </section>
       </main>
 
+      <KillPortModal
+        open={killPortOpen}
+        onClose={() => setKillPortOpen(false)}
+        onToast={addToast}
+      />
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onChange={setSettings}
-        javaPath={runtimeSettings.javaPath ?? ""}
-        javaError={javaError}
-        savingJavaPath={savingJavaPath}
-        onPickJavaFolder={handlePickJavaFolder}
-        onPickJavaFile={handlePickJavaFile}
+        javaPath={java.runtimeSettings.javaPath ?? ""}
+        javaError={java.javaError}
+        savingJavaPath={java.savingJavaPath}
+        onPickJavaFolder={java.pickFolder}
+        onPickJavaFile={java.pickFile}
         onSaveJavaPath={handleSaveJavaPath}
+        onRebuildServices={handleRebuildServices}
       />
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t) => (
@@ -420,99 +375,5 @@ export function App(props: { onReady?: () => void }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function ResizeHandle(props: { value: number; onChange: (v: number) => void; min: number; max: number }) {
-  const dragging = useRef(false);
-  const startX = useRef(0);
-  const startW = useRef(0);
-
-  const onDown = useCallback(
-    (e: React.MouseEvent) => {
-      dragging.current = true;
-      startX.current = e.clientX;
-      startW.current = props.value;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-
-      const onMove = (ev: MouseEvent) => {
-        if (!dragging.current) return;
-        const w = Math.min(props.max, Math.max(props.min, startW.current + ev.clientX - startX.current));
-        props.onChange(w);
-      };
-      const onUp = () => {
-        dragging.current = false;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-      };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    },
-    [props],
-  );
-
-  return (
-    <div
-      className="w-1 shrink-0 cursor-col-resize hover:bg-accent/20 active:bg-accent/40 transition-colors"
-      onMouseDown={onDown}
-    />
-  );
-}
-
-function Toolbar(props: { onSettings: () => void }) {
-  return (
-    <header
-      className="flex items-center justify-between gap-3 px-4 py-2 border-b border-[#ff7a0026] bg-[#04070d]/95 backdrop-blur-md shrink-0"
-      style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-    >
-      <div className="flex items-center gap-2.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-        <img
-          src="/lemain-icon.png"
-          alt="Orchestrator"
-          className="h-7 w-7 rounded-xl border border-[#ff7a0045] shadow-[0_0_18px_rgba(255,122,0,0.2)] object-cover"
-        />
-        <span className="text-xs font-semibold text-slate-200 tracking-tight">Orchestrator</span>
-      </div>
-      <div className="flex items-center gap-1 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-        <Tooltip text="Configurações (⌘ ,)">
-          <button className="btn btn-ghost text-2xs px-1.5" onClick={props.onSettings}>
-            <Icon.Settings className="h-3.5 w-3.5" />
-          </button>
-        </Tooltip>
-      </div>
-    </header>
-  );
-}
-
-function ContainerTabs(props: {
-  containers: ContainerDto[];
-  selectedContainer: string | null;
-  onSelect: (id: string | null) => Promise<void>;
-}) {
-  return (
-    <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: "none" }}>
-      <TabBtn active={props.selectedContainer === null} onClick={() => void props.onSelect(null)}>
-        Todos
-      </TabBtn>
-      {props.containers.map((c) => (
-        <TabBtn key={c.id} active={props.selectedContainer === c.id} onClick={() => void props.onSelect(c.id)}>
-          {c.name}
-        </TabBtn>
-      ))}
-    </div>
-  );
-}
-
-function TabBtn(props: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      className={`rounded-md px-2.5 py-1 text-2xs font-medium whitespace-nowrap shrink-0 transition-all duration-150 ${props.active ? "bg-accent/15 text-accent" : "text-slate-500 hover:text-slate-300 hover:bg-surface-3"}`}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </button>
   );
 }

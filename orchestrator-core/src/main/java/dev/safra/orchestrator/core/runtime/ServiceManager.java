@@ -241,6 +241,7 @@ public class ServiceManager {
         def.getName(), def.getPath(), def.getCommand(), def.getLogFile(),
         def.getEnv(), def.getDetectedPort(), def.getCustomPort(), def.getPortStrategy(), def.getJavaHome(), def.getJavaVersion(), def.getContainerIds(),
         def.getProjectType(), def.getAvailableScripts(), def.getSelectedScript(),
+        MavenWrapperDetector.usesWrapper(def), MavenWrapperDetector.hasWrapper(def),
         rt.getPid(), rt.getStatus(), rt.getLastStartAt(), rt.getLastStopAt(), rt.getLastError());
   }
 

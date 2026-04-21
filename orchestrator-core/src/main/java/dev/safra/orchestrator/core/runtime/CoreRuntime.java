@@ -175,6 +175,14 @@ public class CoreRuntime {
         List<JavaVersionDetector.JdkInfo> jdks = processManager.getJavaDetector().detectAll();
         yield om.valueToTree(jdks);
       }
+      case "getActiveJavaInfo" -> {
+        com.fasterxml.jackson.databind.node.ObjectNode info = om.getNodeFactory().objectNode();
+        info.put("javaHome", System.getProperty("java.home", ""));
+        info.put("javaVersion", System.getProperty("java.version", ""));
+        info.put("vendor", System.getProperty("java.vendor", ""));
+        info.put("runtimeName", System.getProperty("java.runtime.name", ""));
+        yield info;
+      }
       case "setServiceScript" -> {
         String name = reqName(params);
         String script = params != null && params.hasNonNull("script") ? params.get("script").asText() : null;
@@ -253,6 +261,32 @@ public class CoreRuntime {
         if (wasRunning) serviceManager.start(name);
         emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
         yield serviceManager.list();
+      }
+      case "setServiceMvnWrapper" -> {
+        String name = reqName(params);
+        boolean enabled = params != null && params.has("enabled") && params.get("enabled").asBoolean(false);
+        ServiceDescriptor sd = serviceManager.requireService(name);
+        ServiceDefinition def = sd.getDefinition();
+        if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT) {
+          throw new IllegalArgumentException("Wrapper Maven aplicável apenas a projetos Spring Boot");
+        }
+        if (enabled && !MavenWrapperDetector.hasWrapper(def)) {
+          throw new IllegalStateException("Projeto não possui wrapper Maven (mvnw) na pasta.");
+        }
+        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
+        if (wasRunning) serviceManager.stop(name);
+        def.setUseMvnWrapper(enabled);
+        WorkspaceDefinitionSync.applyMvnWrapperPreference(def);
+        workspaceManager.persistWorkspace();
+        if (wasRunning) serviceManager.start(name);
+        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
+        yield serviceManager.list();
+      }
+      case "rebuildServices" -> {
+        serviceManager.stopAll();
+        JsonNode result = workspaceManager.rebuildServices();
+        emitEvent.accept("services", result);
+        yield result;
       }
       case "checkPortFree" -> {
         int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;

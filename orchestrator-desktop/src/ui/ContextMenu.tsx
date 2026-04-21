@@ -23,11 +23,15 @@ export function ContextMenu(props: {
   onSetJava: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
   onSetPort: (name: string, currentPort?: string) => void;
+  onSetMvnWrapper: (name: string, enabled: boolean) => Promise<void>;
 }) {
   const { s } = props;
   const uniqueVersions = [...new Set(props.jdks.map((j) => j.majorVersion))];
   const isJs = s.projectType && s.projectType !== "SPRING_BOOT";
+  const isJava = !s.projectType || s.projectType === "SPRING_BOOT";
   const canChangePort = canChangeServicePort(s);
+  const usingMvnWrapper = !!s.useMvnWrapper;
+  const hasMvnWrapper = !!s.hasMvnWrapper;
   const scripts = s.availableScripts ?? [];
   const activeScript = s.selectedScript ?? (s.command?.[2] || null);
   const [openSub, setOpenSub] = useState<string | null>(null);
@@ -134,6 +138,20 @@ export function ContextMenu(props: {
                 props.onClose();
               }}
             />
+          )}
+
+          {isJava && hasMvnWrapper && (
+            <>
+              <div className="divider my-1" />
+              <MenuItem
+                icon={usingMvnWrapper ? "X" : "Check"}
+                label={usingMvnWrapper ? "Não usar wrapper Maven" : "Usar wrapper Maven (mvnw)"}
+                onClick={async () => {
+                  await props.onSetMvnWrapper(s.name, !usingMvnWrapper);
+                  props.onClose();
+                }}
+              />
+            </>
           )}
 
           {props.containers.length > 0 && (

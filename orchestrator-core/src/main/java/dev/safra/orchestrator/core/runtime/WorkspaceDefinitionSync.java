@@ -80,6 +80,25 @@ public final class WorkspaceDefinitionSync {
         def.setJavaVersion(prev.getJavaVersion());
         def.setJavaHome(null);
       }
+      if (prev.getUseMvnWrapper() != null) {
+        def.setUseMvnWrapper(prev.getUseMvnWrapper());
+        applyMvnWrapperPreference(def);
+      }
+    }
+  }
+
+  public static void applyMvnWrapperPreference(ServiceDefinition def) {
+    if (def == null || def.getCommand() == null || def.getCommand().isEmpty()) return;
+    if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT) return;
+    boolean hasWrapper = MavenWrapperDetector.hasWrapper(def);
+    boolean preferWrapper = def.getUseMvnWrapper() != null ? def.getUseMvnWrapper() : hasWrapper;
+    boolean useWrapper = preferWrapper && hasWrapper;
+    String desired = useWrapper ? "./mvnw" : "mvn";
+    List<String> next = new ArrayList<>(def.getCommand());
+    String first = next.get(0);
+    if ("mvn".equalsIgnoreCase(first) || "./mvnw".equals(first) || "mvnw".equalsIgnoreCase(first)) {
+      next.set(0, desired);
+      def.setCommand(next);
     }
   }
 

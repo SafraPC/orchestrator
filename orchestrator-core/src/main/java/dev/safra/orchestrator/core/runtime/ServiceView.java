@@ -22,6 +22,8 @@ public record ServiceView(
         ProjectType projectType,
         List<String> availableScripts,
         String selectedScript,
+        Boolean useMvnWrapper,
+        Boolean hasMvnWrapper,
         Long pid,
         ServiceStatus status,
         Instant lastStartAt,

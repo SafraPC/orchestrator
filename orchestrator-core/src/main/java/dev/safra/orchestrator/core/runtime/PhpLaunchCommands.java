@@ -2,7 +2,10 @@ package dev.safra.orchestrator.core.runtime;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import dev.safra.orchestrator.model.ProjectType;
@@ -68,7 +71,7 @@ public final class PhpLaunchCommands {
   }
 
   public static List<String> artisanServeCommand(int port) {
-    return List.of("php", "artisan", "serve", "--host=127.0.0.1", "--port=" + port);
+    return List.of("php", "artisan", "serve", "--host=localhost", "--port=" + port);
   }
 
   public static List<String> composerRunCommand(String script) {
@@ -83,7 +86,7 @@ public final class PhpLaunchCommands {
   }
 
   public static List<String> builtinServerCommand(String docroot, int port) {
-    return List.of("php", "-S", "127.0.0.1:" + port, "-t", docroot);
+    return List.of("php", "-S", "localhost:" + port, "-t", docroot);
   }
 
   public static int defaultPort(ProjectType type) {
@@ -145,13 +148,13 @@ public final class PhpLaunchCommands {
     def.setName(serviceName);
     def.setPath(dir.toAbsolutePath().normalize().toString());
     def.setLogFile(logsDir.resolve(serviceName + ".log").toString());
-    def.setContainerIds(new java.util.ArrayList<>());
+    def.setContainerIds(new ArrayList<>());
     def.setProjectType(ProjectType.STANDALONE_PHP);
     def.setAvailableScripts(List.of(docroot));
     def.setSelectedScript(docroot);
     def.setDetectedPort(port);
     def.setPortStrategy("CLI");
-    java.util.Map<String, String> env = new java.util.HashMap<>();
+    Map<String, String> env = new HashMap<>();
     env.put("PHP_DOCROOT", docroot);
     def.setEnv(env);
     def.setCommand(builtinServerCommand(docroot, port));

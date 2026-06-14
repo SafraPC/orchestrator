@@ -87,7 +87,7 @@ export function ContextMenu(props: {
           <MenuItem icon="Folder" label="Abrir pasta" onClick={async () => { props.onClose(); await api.openServiceFolder(s.name).catch(() => {}); }} />
           <MenuItem icon="Terminal" label="Abrir terminal" onClick={async () => { props.onClose(); await api.openServiceTerminal(s.name).catch(() => {}); }} />
           <MenuItem icon="Code" label="Abrir no editor" onClick={async () => { props.onClose(); await api.openServiceInEditor(s.name).catch(() => {}); }} />
-          {props.port && <MenuItem icon="Globe" label={`127.0.0.1:${props.port}`} onClick={async () => { props.onClose(); await openUrl(`http://127.0.0.1:${props.port}`).catch(() => {}); }} />}
+          {props.port && <MenuItem icon="Globe" label={`localhost:${props.port}`} onClick={async () => { props.onClose(); await openUrl(`http://localhost:${props.port}`).catch(() => {}); }} />}
 
           {uniqueVersions.length > 0 && (!s.projectType || s.projectType === "SPRING_BOOT") && (
             <>

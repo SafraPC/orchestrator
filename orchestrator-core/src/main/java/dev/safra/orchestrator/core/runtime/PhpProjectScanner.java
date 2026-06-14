@@ -10,8 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +26,6 @@ public class PhpProjectScanner {
       "php-cs-fixer", "deptrac", "infection", "fix",
       "post-autoload-dump", "post-root-package-install", "post-create-project-cmd",
       "post-update-cmd", "pre-autoload-dump", "install-cmd");
-  private static final Pattern PORT_PATTERN = Pattern.compile("(?:--port=|--port\\s+|127\\.0\\.0\\.1:)(\\d+)");
 
   private final ObjectMapper om;
   private final Path logsDir;
@@ -303,11 +300,15 @@ public class PhpProjectScanner {
       if (envPort != null) {
         return envPort;
       }
+      Integer frontendProxyPort = DevServerPortDetector.readSiblingFrontendProxyPort(dir);
+      if (frontendProxyPort != null) {
+        return frontendProxyPort;
+      }
       return PhpLaunchCommands.defaultPort(type);
     }
     JsonNode scripts = root.path("scripts");
     if (scripts.isObject() && scripts.has(selectedScript)) {
-      Integer fromScript = parsePort(scripts.get(selectedScript).asText(""));
+      Integer fromScript = DevServerPortDetector.parsePort(scriptBody(scripts.get(selectedScript)));
       if (fromScript != null) {
         return fromScript;
       }
@@ -316,43 +317,15 @@ public class PhpProjectScanner {
     if (envPort != null) {
       return envPort;
     }
+    Integer frontendProxyPort = DevServerPortDetector.readSiblingFrontendProxyPort(dir);
+    if (frontendProxyPort != null) {
+      return frontendProxyPort;
+    }
     return PhpLaunchCommands.defaultPort(type);
   }
 
   private Integer readEnvPort(Path dir) {
-    Path envFile = dir.resolve(".env");
-    if (!Files.isRegularFile(envFile)) {
-      return null;
-    }
-    try {
-      for (String line : Files.readAllLines(envFile)) {
-        String trimmed = line.trim();
-        if (trimmed.startsWith("APP_PORT=")) {
-          return parseInt(trimmed.substring(9).trim());
-        }
-        if (trimmed.startsWith("SERVER_PORT=")) {
-          return parseInt(trimmed.substring(12).trim());
-        }
-      }
-    } catch (Exception ignored) {
-    }
-    return null;
-  }
-
-  private Integer parsePort(String text) {
-    Matcher match = PORT_PATTERN.matcher(text);
-    if (match.find()) {
-      return parseInt(match.group(1));
-    }
-    return null;
-  }
-
-  private Integer parseInt(String value) {
-    try {
-      return Integer.parseInt(value.trim());
-    } catch (NumberFormatException e) {
-      return null;
-    }
+    return DevServerPortDetector.readEnvPort(dir, List.of("APP_PORT", "SERVER_PORT", "PORT"));
   }
 
   private record PhpMetadata(

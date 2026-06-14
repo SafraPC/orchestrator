@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DEPS_HELPER="$ROOT_DIR/scripts/unix/ensure-build-deps.sh"
 RUN_SMOKE=0
 
 for arg in "$@"; do
@@ -21,6 +22,10 @@ for arg in "$@"; do
 done
 
 log() { printf "\n[verify] %s\n" "$*"; }
+
+if [[ -x "$DEPS_HELPER" ]]; then
+  eval "$("$DEPS_HELPER")"
+fi
 
 log "Maven package (orchestrator-core)"
 (cd "$ROOT_DIR/orchestrator-core" && mvn -q -DskipTests package)

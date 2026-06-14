@@ -34,6 +34,8 @@ esac
 DEPS_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/OrchestratorBuildDeps"
 TMP_ROOT="${TMPDIR:-/tmp}/orchestrator-build-deps"
 MAVEN_VERSION="3.9.9"
+RUSTUP_HOME_LOCAL="$DEPS_ROOT/rustup"
+CARGO_HOME_LOCAL="$DEPS_ROOT/cargo"
 
 mkdir -p "$DEPS_ROOT" "$TMP_ROOT"
 
@@ -179,6 +181,26 @@ ensure_node() {
   printf '%s\n' "$resolved"
 }
 
+ensure_rust() {
+  if command -v cargo >/dev/null 2>&1; then
+    dirname "$(command -v cargo)"
+    return
+  fi
+  local cargo_bin="$CARGO_HOME_LOCAL/bin"
+  if [[ -x "$cargo_bin/cargo" ]]; then
+    log "Rust local encontrado em $cargo_bin"
+    printf '%s\n' "$cargo_bin"
+    return
+  fi
+  local rustup_init="$TMP_ROOT/rustup-init"
+  log "baixando Rust stable mínimo"
+  curl -fsSL "https://sh.rustup.rs" -o "$rustup_init"
+  chmod +x "$rustup_init"
+  RUSTUP_HOME="$RUSTUP_HOME_LOCAL" CARGO_HOME="$CARGO_HOME_LOCAL" "$rustup_init" -y --no-modify-path --profile minimal --default-toolchain stable >&2
+  log "Rust preparado em $cargo_bin"
+  printf '%s\n' "$cargo_bin"
+}
+
 add_path_entry() {
   python3 - <<'PY' "${1:-}" "${2:-}"
 import os
@@ -194,7 +216,7 @@ PY
 }
 
 persist_env() {
-  local java_home="$1" maven_home="$2" node_home="$3"
+  local java_home="$1" maven_home="$2" node_home="$3" cargo_bin="$4"
   local shell_name rc_file
   shell_name="$(basename "${SHELL:-}")"
   if [[ "$shell_name" == "zsh" ]]; then
@@ -226,7 +248,9 @@ PY
     printf '\n%s\n' "$begin"
     printf 'export JAVA_HOME="%s"\n' "$java_home"
     printf 'export MAVEN_HOME="%s"\n' "$maven_home"
-    printf 'export PATH="%s/bin:%s/bin:%s/bin:$PATH"\n' "$node_home" "$maven_home" "$java_home"
+    printf 'export RUSTUP_HOME="%s"\n' "$RUSTUP_HOME_LOCAL"
+    printf 'export CARGO_HOME="%s"\n' "$CARGO_HOME_LOCAL"
+    printf 'export PATH="%s:%s/bin:%s/bin:%s/bin:$PATH"\n' "$cargo_bin" "$node_home" "$maven_home" "$java_home"
     printf '%s\n' "$end"
   } >> "$rc_file"
   log "variáveis persistidas em $rc_file"
@@ -235,17 +259,23 @@ PY
 JAVA_HOME_LOCAL="$(ensure_java)"
 MAVEN_HOME_LOCAL="$(ensure_maven)"
 NODE_HOME_LOCAL="$(ensure_node)"
+RUST_BIN_LOCAL="$(ensure_rust)"
 PATH_VALUE="${PATH:-}"
+PATH_VALUE="$(add_path_entry "$PATH_VALUE" "$RUST_BIN_LOCAL")"
 PATH_VALUE="$(add_path_entry "$PATH_VALUE" "$NODE_HOME_LOCAL/bin")"
 PATH_VALUE="$(add_path_entry "$PATH_VALUE" "$MAVEN_HOME_LOCAL/bin")"
 PATH_VALUE="$(add_path_entry "$PATH_VALUE" "$JAVA_HOME_LOCAL/bin")"
 
 if [[ "$PERSIST" == "1" ]]; then
-  persist_env "$JAVA_HOME_LOCAL" "$MAVEN_HOME_LOCAL" "$NODE_HOME_LOCAL"
+  persist_env "$JAVA_HOME_LOCAL" "$MAVEN_HOME_LOCAL" "$NODE_HOME_LOCAL" "$RUST_BIN_LOCAL"
 fi
 
 printf 'export ORCHESTRATOR_DEPS_ROOT=%q\n' "$DEPS_ROOT"
 printf 'export JAVA_HOME=%q\n' "$JAVA_HOME_LOCAL"
 printf 'export MAVEN_HOME=%q\n' "$MAVEN_HOME_LOCAL"
+if [[ "$RUST_BIN_LOCAL" == "$CARGO_HOME_LOCAL/bin" ]]; then
+  printf 'export RUSTUP_HOME=%q\n' "$RUSTUP_HOME_LOCAL"
+  printf 'export CARGO_HOME=%q\n' "$CARGO_HOME_LOCAL"
+fi
 printf 'export PATH=%q\n' "$PATH_VALUE"
 printf 'export ORCHESTRATOR_NODE_HOME=%q\n' "$NODE_HOME_LOCAL"

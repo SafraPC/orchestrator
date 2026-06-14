@@ -6,11 +6,12 @@ Todos os scripts de build, dev e verificação ficam aqui — a raiz do reposit�
 
 ```text
 scripts/
+├── run-dev.sh      atalho macOS para debug local com logs verbosos
 ├── unix/           macOS, Linux, Git Bash
 │   ├── start.sh    dev completo (Maven + Vite + Tauri)
 │   ├── build.sh    release bundle
 │   ├── verify.sh   compile check (+ --smoke opcional)
-│   └── ensure-build-deps.sh
+│   └── ensure-build-deps.sh  prepara Java, Maven, Node e Rust locais
 ├── windows/
 │   ├── start.cmd   atalho → start.ps1
 │   ├── start.ps1
@@ -34,6 +35,7 @@ Dev boot interno (chamado por `start.*`): `orchestrator-desktop/scripts/run-dev.
 | Ação | macOS/Linux | Windows |
 | --- | --- | --- |
 | Dev | `./scripts/unix/start.sh` | `.\scripts\windows\start.cmd` |
+| Debug local macOS | `./scripts/run-dev.sh` | — |
 | Build | `./scripts/unix/build.sh` | `.\scripts\windows\build.cmd` |
 | Verify | `./scripts/unix/verify.sh` | `.\scripts\windows\verify.ps1` |
 | Install release | `bash scripts/install/install.sh` | `.\scripts\install\install.ps1` |

@@ -273,6 +273,7 @@ if (!fs.existsSync(jar)) {
 log(`Jar em ${jar}`);
 
 process.env.ORCHESTRATOR_CORE_JAR = jar;
+process.env.ORCHESTRATOR_PROTECTED_PORTS = [process.env.ORCHESTRATOR_PROTECTED_PORTS, "5173"].filter(Boolean).join(",");
 if (!process.env.ORCHESTRATOR_CORE_TRACE) {
   process.env.ORCHESTRATOR_CORE_TRACE = verboseLogs ? "1" : "0";
 }

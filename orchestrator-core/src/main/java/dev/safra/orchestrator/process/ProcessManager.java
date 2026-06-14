@@ -20,6 +20,7 @@ public class ProcessManager {
   private final Duration killTimeout;
   private final JavaVersionDetector javaDetector = new JavaVersionDetector();
   private final PhpVersionDetector phpDetector = new PhpVersionDetector();
+  private final List<Integer> protectedPorts = parseProtectedPorts(System.getenv("ORCHESTRATOR_PROTECTED_PORTS"));
 
   private enum RuntimeKind {
     JAVA, PHP, JS
@@ -54,6 +55,7 @@ public class ProcessManager {
       Integer startupPort = resolveStartupPort(def, isJava);
       Map<String, String> startupEnv = buildStartupEnv(def, isJava, startupPort);
 
+      validateStartupPort(def, startupPort);
       freePort(startupPort);
 
       if (isJava) {
@@ -390,7 +392,7 @@ public class ProcessManager {
       return cmd;
     }
     List<String> updated = new ArrayList<>(cmd);
-    String value = "127.0.0.1:" + startupPort;
+    String value = "localhost:" + startupPort;
     for (int i = 0; i < updated.size(); i++) {
       String token = updated.get(i);
       if (token.startsWith("127.0.0.1:") || token.startsWith("localhost:")) {
@@ -464,6 +466,29 @@ public class ProcessManager {
     }
     Map<String, String> env = Map.of("SERVER_PORT", String.valueOf(port));
     PortProcessKiller.freePort(env, isWindows());
+  }
+
+  private void validateStartupPort(ServiceDefinition def, Integer port) {
+    if (port == null || !protectedPorts.contains(port)) {
+      return;
+    }
+    throw new IllegalStateException("Porta " + port
+        + " está reservada pelo Orchestrator em modo desenvolvimento. Configure outra porta para o serviço "
+        + def.getName() + ".");
+  }
+
+  private static List<Integer> parseProtectedPorts(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return List.of();
+    }
+    List<Integer> ports = new ArrayList<>();
+    for (String part : raw.split(",")) {
+      try {
+        ports.add(Integer.parseInt(part.trim()));
+      } catch (NumberFormatException ignored) {
+      }
+    }
+    return ports;
   }
 
   private void monitorProcess(long pid, String serviceName) {

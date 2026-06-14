@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
 import { preserveCurrentBranches } from "./serviceMeta";
@@ -18,12 +18,14 @@ export function useWorkspaceData(options: {
   onReady?: () => void;
   onServicesLoaded?: (services: ServiceDto[]) => void;
 }) {
-  const { addToast, setJavaError, onJavaStartupError, onReady, onServicesLoaded } = options;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const [services, setServices] = useState<ServiceDto[]>([]);
   const [containers, setContainers] = useState<ContainerDto[]>([]);
   const [jdks, setJdks] = useState<JdkInfo[]>([]);
   const [phps, setPhps] = useState<PhpInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const readySent = useRef(false);
 
   const refreshJdks = useCallback(async () => {
     try {
@@ -51,21 +53,21 @@ export function useWorkspaceData(options: {
       const [list, ctrs] = packed as [ServiceDto[], ContainerDto[]];
       setServices((prev) => preserveCurrentBranches(list, prev));
       setContainers(ctrs);
-      onServicesLoaded?.(list);
-      setJavaError(null);
+      optionsRef.current.onServicesLoaded?.(list);
+      optionsRef.current.setJavaError(null);
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addToast("error", message);
+      optionsRef.current.addToast("error", message);
       if (isJavaStartupError(message)) {
-        setJavaError(message);
-        onJavaStartupError?.();
+        optionsRef.current.setJavaError(message);
+        optionsRef.current.onJavaStartupError?.();
       }
       return false;
     } finally {
       setLoading(false);
     }
-  }, [addToast, setJavaError, onJavaStartupError, onServicesLoaded]);
+  }, []);
 
   const refresh = useCallback(async () => {
     await refreshData();
@@ -82,17 +84,19 @@ export function useWorkspaceData(options: {
   }, [refresh]);
 
   useEffect(() => {
-    if (!loading) onReady?.();
-  }, [loading, onReady]);
+    if (loading || readySent.current) return;
+    readySent.current = true;
+    optionsRef.current.onReady?.();
+  }, [loading]);
 
   useEffect(() => {
     if (!loading) return;
     const timer = setTimeout(() => {
       setLoading(false);
-      addToast("error", "Core demorou para responder. Abra Configurações e verifique Java.");
+      optionsRef.current.addToast("error", "Core demorou para responder. Abra Configurações e verifique Java.");
     }, BOOTSTRAP_FALLBACK_MS);
     return () => clearTimeout(timer);
-  }, [loading, addToast]);
+  }, [loading]);
 
   useEffect(() => {
     void refreshJdks();

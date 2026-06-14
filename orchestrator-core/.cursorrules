@@ -34,4 +34,4 @@ mvn clean package -DskipTests # standalone JAR → copy to desktop src-tauri/
 ```
 
 ## Key classes
-WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore
+WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore

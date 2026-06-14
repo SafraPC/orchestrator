@@ -23,7 +23,7 @@ Guia para contribuir ou modificar o projeto sem depender de ferramentas de IA.
 ## Pré-requisitos
 
 - Java 17+, Maven 3.6+, Node.js 18+, Rust stable
-- macOS/Linux: `scripts/unix/start.sh` e `scripts/unix/build.sh` instalam deps locais se faltarem
+- macOS/Linux: `scripts/unix/start.sh` e `scripts/unix/build.sh` instalam Java, Maven, Node e Rust locais se faltarem
 - Windows: `scripts/windows/start.ps1` / `build.ps1` (use `build.cmd` se precisar do MSVC)
 - Linux: pacotes nativos do Tauri — [pré-requisitos v2](https://v2.tauri.app/start/prerequisites/)
 

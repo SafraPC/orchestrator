@@ -139,7 +139,7 @@ export function ServiceRow(props: {
                     className="text-2xs text-accent/70 font-mono cursor-pointer hover:text-accent transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void openUrl(`http://127.0.0.1:${port}`).catch(() => {});
+                      void openUrl(`http://localhost:${port}`).catch(() => {});
                     }}
                   >
                     PORT:{port}

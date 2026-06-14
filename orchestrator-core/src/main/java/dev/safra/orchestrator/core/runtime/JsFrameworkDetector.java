@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,6 +17,26 @@ public final class JsFrameworkDetector {
       ProjectType.FASTIFY,
       ProjectType.HONO,
       ProjectType.REMIX);
+  private static final Set<ProjectType> CLI_PORT_TYPES = Set.of(
+      ProjectType.ASTRO,
+      ProjectType.SVELTE,
+      ProjectType.ANGULAR,
+      ProjectType.NEXT);
+  private static final List<CommandStrategy> COMMAND_STRATEGIES = List.of(
+      new CommandStrategy("CLI", List.of(
+          "astro",
+          "vite",
+          "svelte-kit",
+          "next ",
+          "nuxt",
+          "ng serve",
+          "@angular/cli",
+          "webpack serve",
+          "webpack-dev-server",
+          "vue-cli-service serve"), List.of("next")),
+      new CommandStrategy("ENV", List.of("react-scripts start"), List.of()));
+  private static final Map<ProjectType, List<String>> CLI_TYPE_COMMANDS = Map.of(
+      ProjectType.ANGULAR, List.of("serve"));
 
   private JsFrameworkDetector() {
   }
@@ -81,8 +102,7 @@ public final class JsFrameworkDetector {
     if (ENV_PORT_TYPES.contains(type)) {
       return "ENV";
     }
-    if (type == ProjectType.ASTRO || type == ProjectType.SVELTE || type == ProjectType.ANGULAR
-        || type == ProjectType.NEXT) {
+    if (CLI_PORT_TYPES.contains(type)) {
       return "CLI";
     }
     return "UNSUPPORTED";
@@ -94,37 +114,19 @@ public final class JsFrameworkDetector {
       return typed;
     }
     String cmd = scriptCommand == null ? "" : scriptCommand.toLowerCase(Locale.ROOT);
-    if (cmd.contains("astro")) {
-      return "CLI";
+    String commandStrategy = resolveCommandStrategy(cmd);
+    if (commandStrategy != null) {
+      return commandStrategy;
     }
-    if (cmd.contains("vite") || cmd.contains("svelte-kit")) {
-      return "CLI";
-    }
-    if (cmd.contains("next ")) {
-      return "CLI";
-    }
-    if (cmd.startsWith("next")) {
-      return "CLI";
-    }
-    if (cmd.contains("nuxt")) {
-      return "CLI";
-    }
-    if (cmd.contains("ng serve") || cmd.contains("@angular/cli")) {
-      return "CLI";
-    }
-    if (cmd.contains("webpack serve") || cmd.contains("webpack-dev-server")) {
-      return "CLI";
-    }
-    if (cmd.contains("vue-cli-service serve")) {
-      return "CLI";
-    }
-    if (cmd.contains("react-scripts start")) {
-      return "ENV";
-    }
-    if (type == ProjectType.ANGULAR && cmd.contains("serve")) {
+    if (CLI_TYPE_COMMANDS.getOrDefault(type, List.of()).stream().anyMatch(cmd::contains)) {
       return "CLI";
     }
     return "UNSUPPORTED";
+  }
+
+  public static boolean usesVite(JsonNode root, String scriptCommand) {
+    String cmd = scriptCommand == null ? "" : scriptCommand.toLowerCase(Locale.ROOT);
+    return cmd.contains("vite") || has(root.path("dependencies"), root.path("devDependencies"), "vite");
   }
 
   public static List<String> preferredScripts(ProjectType type) {
@@ -164,5 +166,19 @@ public final class JsFrameworkDetector {
 
   private static boolean hasDep(JsonNode deps, String name) {
     return deps != null && deps.has(name);
+  }
+
+  private static String resolveCommandStrategy(String cmd) {
+    return COMMAND_STRATEGIES.stream()
+        .filter(strategy -> strategy.matches(cmd))
+        .map(CommandStrategy::name)
+        .findFirst()
+        .orElse(null);
+  }
+
+  private record CommandStrategy(String name, List<String> includes, List<String> prefixes) {
+    private boolean matches(String cmd) {
+      return includes.stream().anyMatch(cmd::contains) || prefixes.stream().anyMatch(cmd::startsWith);
+    }
   }
 }

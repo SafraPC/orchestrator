@@ -9,8 +9,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +19,6 @@ import dev.safra.orchestrator.model.ServiceDefinition;
 public class JsProjectScanner {
   private static final Set<String> SKIP_DIRS = Set.of(
       ".git", "target", "node_modules", ".idea", ".next", "dist", "build", ".turbo", ".cache");
-  private static final Pattern PORT_FLAG = Pattern.compile("(?:--port|--PORT|-p)\\s+(\\d+)");
 
   private final ObjectMapper om;
   private final Path logsDir;
@@ -161,7 +158,7 @@ public class JsProjectScanner {
         type,
         scripts,
         selectedScript,
-        extractPort(root, dir, selectedScript, type),
+        extractPort(root, dir, selectedScript, type, scriptCommand),
         JsFrameworkDetector.resolvePortStrategy(scriptCommand, type));
   }
 
@@ -187,26 +184,20 @@ public class JsProjectScanner {
     return out;
   }
 
-  private int extractPort(JsonNode root, Path dir, String selectedScript, ProjectType type) {
+  private int extractPort(JsonNode root, Path dir, String selectedScript, ProjectType type, String scriptCommand) {
     JsonNode scripts = root.path("scripts");
     if (scripts.isObject() && scripts.has(selectedScript)) {
-      Matcher selectedMatch = PORT_FLAG.matcher(scripts.get(selectedScript).asText(""));
-      if (selectedMatch.find()) {
-        try {
-          return Integer.parseInt(selectedMatch.group(1));
-        } catch (NumberFormatException ignored) {
-        }
+      Integer fromSelectedScript = DevServerPortDetector.parsePort(scripts.get(selectedScript).asText(""));
+      if (fromSelectedScript != null) {
+        return fromSelectedScript;
       }
     }
     if (scripts.isObject()) {
       for (var it = scripts.fields(); it.hasNext();) {
         var entry = it.next();
-        Matcher match = PORT_FLAG.matcher(entry.getValue().asText(""));
-        if (match.find()) {
-          try {
-            return Integer.parseInt(match.group(1));
-          } catch (NumberFormatException ignored) {
-          }
+        Integer fromScript = DevServerPortDetector.parsePort(entry.getValue().asText(""));
+        if (fromScript != null) {
+          return fromScript;
         }
       }
     }
@@ -214,27 +205,18 @@ public class JsProjectScanner {
     if (envPort != null) {
       return envPort;
     }
+    Integer vitePort = DevServerPortDetector.readViteServerPort(dir);
+    if (vitePort != null) {
+      return vitePort;
+    }
+    if (JsFrameworkDetector.usesVite(root, scriptCommand)) {
+      return 5173;
+    }
     return JsFrameworkDetector.defaultPort(type);
   }
 
   private Integer readEnvPort(Path dir) {
-    Path envFile = dir.resolve(".env");
-    if (!Files.exists(envFile)) {
-      return null;
-    }
-    try {
-      for (String line : Files.readAllLines(envFile)) {
-        String trimmed = line.trim();
-        if (trimmed.startsWith("PORT=")) {
-          try {
-            return Integer.parseInt(trimmed.substring(5).trim());
-          } catch (NumberFormatException ignored) {
-          }
-        }
-      }
-    } catch (Exception ignored) {
-    }
-    return null;
+    return DevServerPortDetector.readEnvPort(dir, List.of("PORT", "VITE_PORT"));
   }
 
   private String selectScript(List<String> scripts, ProjectType type, String preferredScript) {

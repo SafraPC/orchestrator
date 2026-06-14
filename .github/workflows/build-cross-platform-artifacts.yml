@@ -103,8 +103,7 @@ jobs:
             "$WEBKIT_PKG" \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf \
-            dpkg-sig
+            patchelf
 
       - name: Build orchestrator-core jar
         run: mvn -q -DskipTests clean package
@@ -244,10 +243,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p updater-sigs
-          shopt -s nullglob globstar
-          for f in orchestrator-desktop/src-tauri/target/release/bundle/**/*.sig; do
-            cp "$f" updater-sigs/
-          done
+          if [ -d orchestrator-desktop/src-tauri/target/release/bundle ]; then
+            find orchestrator-desktop/src-tauri/target/release/bundle -name '*.sig' -type f -exec cp {} updater-sigs/ \;
+          fi
 
       - name: Upload updater signatures
         uses: actions/upload-artifact@v4

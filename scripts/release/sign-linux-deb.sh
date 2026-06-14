@@ -15,8 +15,8 @@ if [[ -z "$KEY" ]]; then
 fi
 
 if ! command -v dpkg-sig >/dev/null 2>&1; then
-  echo "dpkg-sig não encontrado (apt install dpkg-sig)" >&2
-  exit 1
+  echo "dpkg-sig não encontrado — pulando assinatura deb (opcional no Ubuntu 24.04+)" >&2
+  exit 0
 fi
 
 dpkg-sig -k "$KEY" --sign builder "$DEB"

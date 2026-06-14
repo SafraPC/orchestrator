@@ -6,3 +6,8 @@
 Ordem de detecção: Next → Nest → Remix → Angular → Astro → Svelte → Fastify → Hono → Express → Vue → React → UNKNOWN.
 
 `JsProjectScanner` delega detecção e usa `npm run` para todos os tipos acima.
+
+## PHP runtime layer
+`PhpProjectScanner` detecta projetos com `composer.json` e docroot web; `PhpLaunchCommands` monta `artisan:serve`, `symfony:serve` ou `php:serve`.
+
+Comandos web iniciados diretamente por `php` devem manter `display_errors=0` e `log_errors=1` para não misturar warnings/deprecations no corpo JSON das APIs.

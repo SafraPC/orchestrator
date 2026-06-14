@@ -15,6 +15,9 @@ public final class PhpLaunchCommands {
   public static final String ARTISAN_SERVE = "artisan:serve";
   public static final String SYMFONY_SERVE = "symfony:serve";
   public static final String PHP_BUILTIN_SERVE = "php:serve";
+  private static final List<String> PHP_WEB_RUNTIME_OPTIONS = List.of(
+      "-d", "display_errors=0",
+      "-d", "log_errors=1");
   private static final int DEFAULT_PORT = 8000;
 
   private PhpLaunchCommands() {
@@ -71,7 +74,7 @@ public final class PhpLaunchCommands {
   }
 
   public static List<String> artisanServeCommand(int port) {
-    return List.of("php", "artisan", "serve", "--host=localhost", "--port=" + port);
+    return phpWebCommand("artisan", "serve", "--host=localhost", "--port=" + port);
   }
 
   public static List<String> composerRunCommand(String script) {
@@ -86,7 +89,15 @@ public final class PhpLaunchCommands {
   }
 
   public static List<String> builtinServerCommand(String docroot, int port) {
-    return List.of("php", "-S", "localhost:" + port, "-t", docroot);
+    return phpWebCommand("-S", "localhost:" + port, "-t", docroot);
+  }
+
+  private static List<String> phpWebCommand(String... args) {
+    List<String> command = new ArrayList<>();
+    command.add("php");
+    command.addAll(PHP_WEB_RUNTIME_OPTIONS);
+    command.addAll(List.of(args));
+    return command;
   }
 
   public static int defaultPort(ProjectType type) {

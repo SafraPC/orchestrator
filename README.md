@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/badge/release-v1.0.4-0ea5e9?style=for-the-badge">
+    <img alt="Latest release" src="https://img.shields.io/badge/release-v1.0.5-0ea5e9?style=for-the-badge">
   </a>
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
     <img alt="Downloads" src="https://img.shields.io/github/downloads/SafraPC/orchestrator/total?style=for-the-badge&color=84cc16">

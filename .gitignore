@@ -12,6 +12,8 @@ orchestrator-core/services.yaml
 orchestrator-core/.orchestrator/
 orchestrator-desktop/src-tauri/orchestrator-core-standalone.jar
 orchestrator-desktop/src-tauri/orchestrator-updater.key
+orchestrator-desktop/src-tauri/.github-signing-password.local
+orchestrator-desktop/src-tauri/GITHUB_SECRETS_SETUP.local.txt
 
 *.log
 *.pid

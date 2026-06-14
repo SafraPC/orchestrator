@@ -12,7 +12,6 @@ import java.util.function.Supplier;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import dev.safra.orchestrator.core.runtime.JsLaunchCommands;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
@@ -22,6 +21,7 @@ import dev.safra.orchestrator.model.ServiceView;
 import dev.safra.orchestrator.model.Workspace;
 import dev.safra.orchestrator.process.ProcessManager;
 import dev.safra.orchestrator.process.StopResult;
+
 public class ServiceManager {
   private final ObjectMapper om;
   private final ProcessManager processManager;
@@ -56,8 +56,10 @@ public class ServiceManager {
     if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT
         && JsLaunchCommands.usesNpmRun(def.getProjectType())
         && def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-      String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(def.getSelectedScript(), def.getAvailableScripts());
-      if (selected != null && (def.getSelectedScript() == null || !def.getSelectedScript().equals(selected) || def.getCommand() == null || def.getCommand().isEmpty())) {
+      String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(def.getSelectedScript(),
+          def.getAvailableScripts());
+      if (selected != null && (def.getSelectedScript() == null || !def.getSelectedScript().equals(selected)
+          || def.getCommand() == null || def.getCommand().isEmpty())) {
         def.setSelectedScript(selected);
         def.setCommand(JsLaunchCommands.npmRunCommand(selected));
         persistWorkspace.run();
@@ -66,7 +68,8 @@ public class ServiceManager {
     if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
       validatePhpProject(def);
       if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-        String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(def.getSelectedScript(), def.getAvailableScripts());
+        String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(def.getSelectedScript(),
+            def.getAvailableScripts());
         if (selected != null) {
           PhpLaunchCommands.applySelection(def, selected);
           persistWorkspace.run();
@@ -134,6 +137,7 @@ public class ServiceManager {
     stop(name);
     return start(name);
   }
+
   public JsonNode startAll() {
     List<ServiceView> out = new ArrayList<>();
     for (ServiceDescriptor sd : new ArrayList<>(services.values())) {
@@ -225,6 +229,7 @@ public class ServiceManager {
         .map(this::toView)
         .toList()));
   }
+
   public ServiceDescriptor requireService(String name) {
     ServiceDescriptor sd = services.get(name);
     if (sd == null)
@@ -277,7 +282,8 @@ public class ServiceManager {
     Thread t = new Thread(() -> {
       try {
         Thread.sleep(2000);
-        if (processManager.isAlive(pid)) return;
+        if (processManager.isAlive(pid))
+          return;
         ServiceRuntime rt = sd.getRuntime();
         rt.setStatus(ServiceStatus.ERROR);
         rt.setLastError("Processo terminou após iniciar. Verifique os logs.");
@@ -291,10 +297,13 @@ public class ServiceManager {
               logManager.emitLogStatus(name, "Processo terminou. Últimas linhas:\n" + tail);
             }
           }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         persistRuntime.run();
         emitServiceChanged(name);
-      } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+      } catch (InterruptedException ignored) {
+        Thread.currentThread().interrupt();
+      }
     }, "check-alive-" + name);
     t.setDaemon(true);
     t.start();

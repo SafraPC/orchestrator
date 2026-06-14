@@ -39,9 +39,12 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Maven compile (core)
-        run: mvn -q -DskipTests compile
+      - name: Maven package (core JAR for Tauri)
+        run: mvn -q -DskipTests package
         working-directory: orchestrator-core
+
+      - name: Copy core JAR into Tauri resources
+        run: cp orchestrator-core/target/orchestrator-core-standalone.jar orchestrator-desktop/src-tauri/orchestrator-core-standalone.jar
 
       - name: npm ci + build (desktop)
         run: |

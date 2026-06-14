@@ -9,7 +9,7 @@ for arg in "$@"; do
     --smoke) RUN_SMOKE=1 ;;
     -h|--help)
       echo "Uso: scripts/unix/verify.sh [--smoke]"
-      echo "  Compila core (Maven), frontend (npm build) e Rust (cargo check)."
+      echo "  Compila core (Maven package + JAR), frontend (npm build) e Rust (cargo check)."
       echo "  --smoke  roda npm run verify:core-ipc (exige JAR já gerado)."
       exit 0
       ;;
@@ -22,11 +22,10 @@ done
 
 log() { printf "\n[verify] %s\n" "$*"; }
 
-log "Maven compile (orchestrator-core)"
-(cd "$ROOT_DIR/orchestrator-core" && mvn -q -DskipTests compile)
-
-log "cargo check (src-tauri)"
-(cd "$ROOT_DIR/orchestrator-desktop/src-tauri" && cargo check)
+log "Maven package (orchestrator-core)"
+(cd "$ROOT_DIR/orchestrator-core" && mvn -q -DskipTests package)
+cp "$ROOT_DIR/orchestrator-core/target/orchestrator-core-standalone.jar" \
+  "$ROOT_DIR/orchestrator-desktop/src-tauri/orchestrator-core-standalone.jar"
 
 if command -v npm >/dev/null 2>&1; then
   log "npm run build (orchestrator-desktop)"
@@ -34,6 +33,9 @@ if command -v npm >/dev/null 2>&1; then
 else
   log "npm não encontrado — pulando build do frontend"
 fi
+
+log "cargo check (src-tauri)"
+(cd "$ROOT_DIR/orchestrator-desktop/src-tauri" && cargo check)
 
 if [[ "$RUN_SMOKE" -eq 1 ]]; then
   log "smoke IPC (verify:core-ipc)"

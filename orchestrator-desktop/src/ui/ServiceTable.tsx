@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { api } from "../api/client";
-import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
+import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
 import { Modal } from "./Modal";
 import { ServicePortModal } from "./ServicePortModal";
@@ -20,6 +20,7 @@ export function ServiceTable(props: {
   selectedContainer?: string | null;
   containers?: ContainerDto[];
   jdks?: JdkInfo[];
+  phps?: PhpInfo[];
   onToast?: (t: ToastType, m: string) => void;
   loading?: boolean;
 }) {
@@ -118,6 +119,7 @@ export function ServiceTable(props: {
           busy={busy}
           containers={containers}
           jdks={props.jdks ?? []}
+          phps={props.phps ?? []}
           menuOpen={menuOpen === service.name}
           isDragging={activeId === service.name}
           gripProps={gripProps(service.name)}
@@ -144,12 +146,22 @@ export function ServiceTable(props: {
               props.onToast?.("error", String(error));
             }
           }}
+          onSetPhp={async (name, version) => {
+            setMenuOpen(null);
+            try {
+              const updated = await api.setServicePhpVersion(name, version);
+              props.onServicesUpdate?.(updated);
+              props.onToast?.("success", `PHP ${version ?? "padrão"} → ${name}`);
+            } catch (error) {
+              props.onToast?.("error", String(error));
+            }
+          }}
           onSetScript={async (name, script) => {
             setMenuOpen(null);
             try {
               const updated = await api.setServiceScript(name, script);
               props.onServicesUpdate?.(updated);
-              props.onToast?.("success", `npm run ${script} → ${name}`);
+              props.onToast?.("success", `Script ${script} → ${name}`);
             } catch (error) {
               props.onToast?.("error", String(error));
             }

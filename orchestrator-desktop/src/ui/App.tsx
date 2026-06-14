@@ -21,6 +21,7 @@ import { useJavaRuntime } from "./useJavaRuntime";
 import { useServiceBranchPolling } from "./useServiceBranchPolling";
 import { useServiceFilters } from "./useServiceFilters";
 import { useServiceShortcuts } from "./useServiceShortcuts";
+import { useAppUpdater } from "./useAppUpdater";
 import { useWorkspaceData } from "./useWorkspaceData";
 
 export function App(props: { onReady?: () => void }) {
@@ -33,6 +34,7 @@ export function App(props: { onReady?: () => void }) {
   const [svcW, setSvcW] = useState(288);
 
   const { toasts, addToast, removeToast } = useToast();
+  const appUpdate = useAppUpdater();
   const { settings, setSettings } = useSettings();
   const java = useJavaRuntime();
   const { setJavaError } = java;
@@ -53,10 +55,12 @@ export function App(props: { onReady?: () => void }) {
     containers,
     setContainers,
     jdks,
+    phps,
     loading,
     refresh,
     refreshData,
     refreshJdks,
+    refreshPhps,
     rebuildServices,
   } = workspace;
 
@@ -235,6 +239,7 @@ export function App(props: { onReady?: () => void }) {
               selectedContainer={selectedContainer}
               containers={containers}
               jdks={jdks}
+              phps={phps}
               onToast={addToast}
               loading={loading}
             />
@@ -243,6 +248,7 @@ export function App(props: { onReady?: () => void }) {
             services={services}
             selectedContainer={selectedContainer}
             filteredCount={filteredServices.length}
+            update={appUpdate}
           />
         </section>
         <ResizeHandle value={svcW} onChange={setSvcW} min={220} max={450} />

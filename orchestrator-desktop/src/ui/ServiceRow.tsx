@@ -1,9 +1,9 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
+import type { ContainerDto, JdkInfo, PhpInfo, ProjectType, ServiceDto } from "../api/types";
 import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icons";
 import { Tooltip } from "./Tooltip";
-import { formatBranchLabel, getServicePort } from "./serviceMeta";
+import { formatBranchLabel, getServicePort, isPhpProject } from "./serviceMeta";
 
 const TECH_BADGE: Record<string, { icon: keyof typeof Icon; color: string; label: string }> = {
   SPRING_BOOT: { icon: "Java", color: "text-orange-400", label: "Java" },
@@ -14,6 +14,10 @@ const TECH_BADGE: Record<string, { icon: keyof typeof Icon; color: string; label
   ANGULAR: { icon: "Code", color: "text-red-500", label: "Angular" },
   STATIC_HTML: { icon: "Globe", color: "text-amber-400", label: "HTML" },
   STANDALONE_JS: { icon: "Code", color: "text-yellow-400", label: "JS" },
+  LARAVEL: { icon: "Code", color: "text-red-400", label: "Laravel" },
+  SYMFONY: { icon: "Code", color: "text-violet-400", label: "Symfony" },
+  PHP_COMPOSER: { icon: "Code", color: "text-indigo-400", label: "PHP" },
+  STANDALONE_PHP: { icon: "Code", color: "text-indigo-300", label: "PHP" },
   UNKNOWN: { icon: "Box", color: "text-slate-400", label: "Node" },
 };
 
@@ -34,6 +38,7 @@ export function ServiceRow(props: {
   busy: string | null;
   containers: ContainerDto[];
   jdks: JdkInfo[];
+  phps: PhpInfo[];
   menuOpen: boolean;
   isDragging: boolean;
   gripProps: { onMouseDown: (e: React.MouseEvent) => void };
@@ -44,6 +49,7 @@ export function ServiceRow(props: {
   onAdd: (s: string, c: string) => Promise<void>;
   onRemove: (s: string, c: string) => void;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
+  onSetPhp: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
   onSetPort: (service: ServiceDto) => void;
   onResetPort: (name: string) => Promise<void>;
@@ -90,7 +96,7 @@ export function ServiceRow(props: {
           />
         </span>
         <span className={`truncate text-xs font-medium ${sel ? "text-slate-100" : "text-slate-200"}`}>{s.name}</span>
-        <TechBadge projectType={s.projectType} javaVersion={s.javaVersion} />
+        <TechBadge projectType={s.projectType} javaVersion={s.javaVersion} phpVersion={s.phpVersion} />
         {s.useMvnWrapper && s.hasMvnWrapper && <MvnWrapperBadge />}
         <div className="ml-auto flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           {!isRunning && (
@@ -123,11 +129,13 @@ export function ServiceRow(props: {
                 port={port ?? undefined}
                 containers={containers}
                 jdks={props.jdks}
+                phps={props.phps}
                 onAdd={props.onAdd}
                 onRemove={props.onRemove}
                 onClose={props.onMenuClose}
                 onDelete={props.onDelete}
                 onSetJava={props.onSetJava}
+                onSetPhp={props.onSetPhp}
                 onSetScript={props.onSetScript}
                 onSetPort={() => props.onSetPort(s)}
                 onSetMvnWrapper={props.onSetMvnWrapper}
@@ -225,12 +233,17 @@ function MvnWrapperBadge() {
   );
 }
 
-function TechBadge(props: { projectType?: ProjectType; javaVersion?: string | null }) {
+function TechBadge(props: { projectType?: ProjectType; javaVersion?: string | null; phpVersion?: string | null }) {
   const type = props.projectType ?? "SPRING_BOOT";
   const badge = TECH_BADGE[type];
   if (!badge) return null;
   const Ic = Icon[badge.icon];
-  const label = type === "SPRING_BOOT" && props.javaVersion ? `J${props.javaVersion}` : badge.label;
+  let label = badge.label;
+  if (type === "SPRING_BOOT" && props.javaVersion) {
+    label = `J${props.javaVersion}`;
+  } else if (isPhpProject(type) && props.phpVersion) {
+    label = `P${props.phpVersion}`;
+  }
   return (
     <Tooltip text={badge.label}>
       <span

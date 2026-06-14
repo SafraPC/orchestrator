@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/badge/release-v1.0.3-0ea5e9?style=for-the-badge">
+    <img alt="Latest release" src="https://img.shields.io/badge/release-v1.0.4-0ea5e9?style=for-the-badge">
   </a>
   <a href="https://github.com/SafraPC/orchestrator/releases/latest">
     <img alt="Downloads" src="https://img.shields.io/github/downloads/SafraPC/orchestrator/total?style=for-the-badge&color=84cc16">
@@ -51,6 +51,10 @@
 | Node (genérico) | `package.json` com scripts npm |
 | HTML estático | pasta com `.html`/`.htm` sem `package.json` |
 | JavaScript avulso | `.js`/`.mjs`/`.cjs` executável sem `package.json` |
+| Laravel | `composer.json` + `artisan` |
+| Symfony | `composer.json` + `symfony.lock` ou `symfony/*` |
+| PHP (Composer) | `composer.json` com scripts de desenvolvimento |
+| PHP avulso | `index.php` sem `composer.json` |
 
 ## Feature Tour
 

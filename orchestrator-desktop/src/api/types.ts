@@ -9,6 +9,10 @@ export type ProjectType =
   | "ANGULAR"
   | "STATIC_HTML"
   | "STANDALONE_JS"
+  | "LARAVEL"
+  | "SYMFONY"
+  | "PHP_COMPOSER"
+  | "STANDALONE_PHP"
   | "UNKNOWN";
 
 export type ServiceDto = {
@@ -23,6 +27,8 @@ export type ServiceDto = {
   currentBranch?: string | null;
   javaHome?: string;
   javaVersion?: string;
+  phpHome?: string;
+  phpVersion?: string;
   containerIds?: string[];
   projectType?: ProjectType;
   availableScripts?: string[];
@@ -59,6 +65,13 @@ export type JdkInfo = {
   fullVersion: string;
   path: string;
   vendor: string;
+};
+
+export type PhpInfo = {
+  version: string;
+  fullVersion: string;
+  path: string;
+  source: string;
 };
 
 export type RuntimeSettingsDto = {

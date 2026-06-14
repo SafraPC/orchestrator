@@ -2,8 +2,8 @@ import { useRef, useState, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../api/client";
-import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
-import { getScriptMenuLabel } from "./serviceMeta";
+import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
+import { formatScriptLabel, getScriptMenuLabel, isPhpProject } from "./serviceMeta";
 import { Icon } from "./Icons";
 import { canChangeServicePort } from "./serviceMeta";
 
@@ -17,24 +17,29 @@ export function ContextMenu(props: {
   port?: string;
   containers: ContainerDto[];
   jdks: JdkInfo[];
+  phps: PhpInfo[];
   onAdd: (s: string, c: string) => Promise<void>;
   onRemove: (s: string, c: string) => void;
   onClose: () => void;
   onDelete: () => void;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
+  onSetPhp: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
   onSetPort: (name: string, currentPort?: string) => void;
   onSetMvnWrapper: (name: string, enabled: boolean) => Promise<void>;
 }) {
   const { s } = props;
   const uniqueVersions = [...new Set(props.jdks.map((j) => j.majorVersion))];
-  const isJs = s.projectType && s.projectType !== "SPRING_BOOT";
+  const uniquePhpVersions = [...new Set(props.phps.map((p) => p.version))];
+  const isPhp = isPhpProject(s.projectType);
+  const isJs = s.projectType && s.projectType !== "SPRING_BOOT" && !isPhp;
+  const isConfigurable = isJs || isPhp;
   const isJava = !s.projectType || s.projectType === "SPRING_BOOT";
   const canChangePort = canChangeServicePort(s);
   const usingMvnWrapper = !!s.useMvnWrapper;
   const hasMvnWrapper = !!s.hasMvnWrapper;
   const scripts = s.availableScripts ?? [];
-  const activeScript = s.selectedScript ?? (s.command?.[2] || null);
+  const activeScript = s.selectedScript ?? null;
   const [openSub, setOpenSub] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -112,7 +117,35 @@ export function ContextMenu(props: {
             </>
           )}
 
-          {isJs && scripts.length > 1 && (
+          {uniquePhpVersions.length > 0 && isPhp && (
+            <>
+              <div className="divider my-1" />
+              <SubMenu label="Versão PHP" icon="Code" isOpen={openSub === "php"}
+                menuRef={menuRef} onEnter={() => cancelClose("php")} onLeave={scheduleClose}>
+                {uniquePhpVersions.map((v) => {
+                  const isActive = s.phpVersion === v;
+                  const runtime = props.phps.find((p) => p.version === v);
+                  return (
+                    <button key={v} className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors ${isActive ? "bg-accent/10 text-accent" : "text-slate-400 hover:bg-surface-3 hover:text-slate-200"}`}
+                      onClick={() => void props.onSetPhp(s.name, v)}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-mono font-semibold text-2xs">P{v}</span>
+                        <span className="text-2xs text-slate-600 truncate">{runtime?.source}</span>
+                      </span>
+                      {isActive && <Icon.Check className="h-3 w-3 shrink-0" />}
+                    </button>
+                  );
+                })}
+                <button className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors ${!s.phpVersion ? "bg-accent/10 text-accent" : "text-slate-400 hover:bg-surface-3 hover:text-slate-200"}`}
+                  onClick={() => void props.onSetPhp(s.name, null)}>
+                  <span className="text-2xs">Padrão (PATH)</span>
+                  {!s.phpVersion && <Icon.Check className="h-3 w-3 shrink-0" />}
+                </button>
+              </SubMenu>
+            </>
+          )}
+
+          {isConfigurable && scripts.length > 1 && (
             <>
               <div className="divider my-1" />
               <SubMenu label={getScriptMenuLabel(s.projectType)} icon="Terminal" isOpen={openSub === "script"}
@@ -122,7 +155,7 @@ export function ContextMenu(props: {
                   return (
                     <button key={sc} className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-xs transition-colors ${isActive ? "bg-accent/10 text-accent" : "text-slate-400 hover:bg-surface-3 hover:text-slate-200"}`}
                       onClick={() => void props.onSetScript(s.name, sc)}>
-                      <span className="font-mono text-2xs">{sc}</span>
+                      <span className="font-mono text-2xs">{formatScriptLabel(sc, s.projectType)}</span>
                       {isActive && <Icon.Check className="h-3 w-3 shrink-0" />}
                     </button>
                   );
@@ -130,7 +163,7 @@ export function ContextMenu(props: {
               </SubMenu>
             </>
           )}
-          {isJs && canChangePort && (
+          {isConfigurable && canChangePort && (
             <MenuItem
               icon="Globe"
               label="Alterar porta"

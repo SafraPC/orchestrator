@@ -58,11 +58,28 @@ public final class WorkspaceDefinitionSync {
         continue;
       }
       ProjectType pt = def.getProjectType();
-      if (pt != null && pt != ProjectType.SPRING_BOOT) {
+      if (PhpLaunchCommands.isPhpProject(pt)) {
+        def.setCustomPort(prev.getCustomPort());
+        if (prev.getPhpHome() != null && !prev.getPhpHome().isBlank()) {
+          def.setPhpHome(prev.getPhpHome());
+        }
+        if (prev.getPhpVersion() != null && !prev.getPhpVersion().isBlank()) {
+          def.setPhpVersion(prev.getPhpVersion());
+        }
+        if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
+          String preferred = prev.getSelectedScript();
+          String runtimeScript = selectRuntimePhpScript(preferred, def.getAvailableScripts());
+          if (runtimeScript != null) {
+            PhpLaunchCommands.applySelection(def, runtimeScript);
+          }
+        }
+        continue;
+      }
+      if (pt != null && pt != ProjectType.SPRING_BOOT && JsLaunchCommands.isJsProject(pt)) {
         def.setCustomPort(prev.getCustomPort());
         if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
           String preferred = prev.getSelectedScript();
-          String runtimeScript = WorkspaceDefinitionSync.selectRuntimeJsScript(preferred, def.getAvailableScripts());
+          String runtimeScript = selectRuntimeJsScript(preferred, def.getAvailableScripts());
           if (runtimeScript != null) {
             JsLaunchCommands.applySelection(def, runtimeScript);
           }
@@ -112,6 +129,27 @@ public final class WorkspaceDefinitionSync {
     }
     for (String script : available) {
       if (!NON_RUNTIME_JS_SCRIPTS.contains(script.toLowerCase())) return script;
+    }
+    return available.get(0);
+  }
+
+  public static String selectRuntimePhpScript(String preferred, List<String> available) {
+    if (available == null || available.isEmpty()) {
+      return null;
+    }
+    if (preferred != null && !preferred.isBlank() && available.contains(preferred)) {
+      return preferred;
+    }
+    if (available.contains(PhpLaunchCommands.ARTISAN_SERVE)) {
+      return PhpLaunchCommands.ARTISAN_SERVE;
+    }
+    for (String candidate : List.of("dev", "serve", "start")) {
+      if (available.contains(candidate)) {
+        return candidate;
+      }
+    }
+    if (available.contains(PhpLaunchCommands.SYMFONY_SERVE)) {
+      return PhpLaunchCommands.SYMFONY_SERVE;
     }
     return available.get(0);
   }

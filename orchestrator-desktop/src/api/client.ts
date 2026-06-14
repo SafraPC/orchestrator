@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ActiveJavaInfoDto, ContainerDto, JdkInfo, RuntimeSettingsDto, ServiceBranchMapDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
+import type { ActiveJavaInfoDto, ContainerDto, JdkInfo, PhpInfo, RuntimeSettingsDto, ServiceBranchMapDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
 
 type CoreJob<T> = () => Promise<T>;
 
@@ -74,8 +74,10 @@ export const api = {
   openServiceInEditor: (name: string) => core<{ ok: boolean; message: string }>("openServiceInEditor", { name }),
 
   listJdks: () => core<JdkInfo[]>("listJdks"),
+  listPhpRuntimes: () => core<PhpInfo[]>("listPhpRuntimes"),
   getActiveJavaInfo: () => core<ActiveJavaInfoDto>("getActiveJavaInfo"),
   setServiceJavaVersion: (name: string, javaVersion: string | null) => core<ServiceDto[]>("setServiceJavaVersion", { name, javaVersion }),
+  setServicePhpVersion: (name: string, phpVersion: string | null) => core<ServiceDto[]>("setServicePhpVersion", { name, phpVersion }),
   setServiceScript: (name: string, script: string) => core<ServiceDto[]>("setServiceScript", { name, script }),
   setServiceMvnWrapper: (name: string, enabled: boolean) => core<ServiceDto[]>("setServiceMvnWrapper", { name, enabled }),
   rebuildServices: () => core<ServiceDto[]>("rebuildServices"),

@@ -13,7 +13,7 @@ public final class JsLaunchCommands {
   }
 
   public static boolean isJsProject(ProjectType type) {
-    return type != null && type != ProjectType.SPRING_BOOT;
+    return type != null && type != ProjectType.SPRING_BOOT && !PhpLaunchCommands.isPhpProject(type);
   }
 
   public static boolean usesNpmRun(ProjectType type) {

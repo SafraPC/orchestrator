@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
+import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
 import { preserveCurrentBranches } from "./serviceMeta";
 import type { ToastType } from "./Toast";
 
@@ -22,11 +22,18 @@ export function useWorkspaceData(options: {
   const [services, setServices] = useState<ServiceDto[]>([]);
   const [containers, setContainers] = useState<ContainerDto[]>([]);
   const [jdks, setJdks] = useState<JdkInfo[]>([]);
+  const [phps, setPhps] = useState<PhpInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refreshJdks = useCallback(async () => {
     try {
       setJdks(await api.listJdks());
+    } catch {}
+  }, []);
+
+  const refreshPhps = useCallback(async () => {
+    try {
+      setPhps(await api.listPhpRuntimes());
     } catch {}
   }, []);
 
@@ -89,7 +96,8 @@ export function useWorkspaceData(options: {
 
   useEffect(() => {
     void refreshJdks();
-  }, [refreshJdks]);
+    void refreshPhps();
+  }, [refreshJdks, refreshPhps]);
 
   return {
     services,
@@ -97,10 +105,12 @@ export function useWorkspaceData(options: {
     containers,
     setContainers,
     jdks,
+    phps,
     loading,
     refresh,
     refreshData,
     refreshJdks,
+    refreshPhps,
     rebuildServices,
   };
 }

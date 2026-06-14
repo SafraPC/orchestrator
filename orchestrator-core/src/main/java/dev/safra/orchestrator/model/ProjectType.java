@@ -9,5 +9,9 @@ public enum ProjectType {
   ANGULAR,
   STATIC_HTML,
   STANDALONE_JS,
+  LARAVEL,
+  SYMFONY,
+  PHP_COMPOSER,
+  STANDALONE_PHP,
   UNKNOWN
 }

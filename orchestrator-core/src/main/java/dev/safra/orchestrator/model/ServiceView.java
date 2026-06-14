@@ -15,6 +15,8 @@ public record ServiceView(
     String portStrategy,
     String javaHome,
     String javaVersion,
+    String phpHome,
+    String phpVersion,
     List<String> containerIds,
     ProjectType projectType,
     List<String> availableScripts,

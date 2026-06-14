@@ -57,6 +57,7 @@ public class JsProjectScanner {
           Path dir = file.getParent();
           if (dir == null) return FileVisitResult.CONTINUE;
           if (Files.exists(dir.resolve("pom.xml"))) return FileVisitResult.CONTINUE;
+          if (PhpProjectScanner.isPhpOwnedDirectory(dir)) return FileVisitResult.CONTINUE;
 
           ServiceDefinition def = parsePackageJson(file, dir);
           if (def != null) {
@@ -99,6 +100,9 @@ public class JsProjectScanner {
       return;
     }
     if (def.getProjectType() == ProjectType.STATIC_HTML || def.getProjectType() == ProjectType.STANDALONE_JS) {
+      return;
+    }
+    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
       return;
     }
     try {

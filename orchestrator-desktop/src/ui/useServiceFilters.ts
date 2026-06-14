@@ -11,6 +11,10 @@ const TECH_OPTIONS: DropdownOption<ProjectType>[] = [
   { value: "VUE", label: "Vue", icon: "Vue", iconClassName: "text-emerald-400" },
   { value: "STATIC_HTML", label: "HTML", icon: "Globe", iconClassName: "text-amber-400" },
   { value: "STANDALONE_JS", label: "JS", icon: "Code", iconClassName: "text-yellow-400" },
+  { value: "LARAVEL", label: "Laravel", icon: "Code", iconClassName: "text-red-400" },
+  { value: "SYMFONY", label: "Symfony", icon: "Code", iconClassName: "text-violet-400" },
+  { value: "PHP_COMPOSER", label: "PHP", icon: "Code", iconClassName: "text-indigo-400" },
+  { value: "STANDALONE_PHP", label: "PHP", icon: "Code", iconClassName: "text-indigo-300" },
   { value: "UNKNOWN", label: "Node", icon: "Box", iconClassName: "text-slate-400" },
 ];
 

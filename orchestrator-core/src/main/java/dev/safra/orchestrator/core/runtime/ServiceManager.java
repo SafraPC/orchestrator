@@ -63,6 +63,16 @@ public class ServiceManager {
         persistWorkspace.run();
       }
     }
+    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      validatePhpProject(def);
+      if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
+        String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(def.getSelectedScript(), def.getAvailableScripts());
+        if (selected != null) {
+          PhpLaunchCommands.applySelection(def, selected);
+          persistWorkspace.run();
+        }
+      }
+    }
 
     if (rt.getPid() != null) {
       if (processManager.isAlive(rt.getPid())) {
@@ -288,5 +298,15 @@ public class ServiceManager {
     }, "check-alive-" + name);
     t.setDaemon(true);
     t.start();
+  }
+
+  private void validatePhpProject(ServiceDefinition def) {
+    if (def.getProjectType() == ProjectType.STANDALONE_PHP) {
+      return;
+    }
+    Path vendor = Path.of(def.getPath()).resolve("vendor/autoload.php");
+    if (!Files.isRegularFile(vendor)) {
+      throw new IllegalStateException("Dependências PHP ausentes. Execute composer install em " + def.getPath());
+    }
   }
 }

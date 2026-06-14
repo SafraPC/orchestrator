@@ -41,9 +41,13 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 | ContainerManager | Container CRUD, service linking | core.runtime |
 | LogManager | Log subscriptions, emit lines | core.runtime |
 | ProjectScanner | Walk dirs, find pom.xml, detect Spring Boot | core.runtime |
-| JsProjectScanner | Walk dirs, find package.json; Angular/React/Vue/Next/Nest; `UNKNOWN` = scripts sem framework | core.runtime |
+| JsProjectScanner | Walk dirs, find package.json; ignora dirs PHP (`composer.json` + artisan/symfony); Angular/React/Vue/Next/Nest | core.runtime |
 | StandaloneJsScanner | HTML sem package.json (`STATIC_HTML`); `.js` avulso (`STANDALONE_JS`) | core.runtime |
 | JsLaunchCommands | `npm run`, `npx serve`, `node file.js`; portas e `applySelection` | core.runtime |
+| PhpProjectScanner | `composer.json`; Laravel/Symfony/Composer; ignora dirs com `pom.xml` | core.runtime |
+| StandalonePhpScanner | `index.php` sem manifest (`STANDALONE_PHP`) | core.runtime |
+| PhpLaunchCommands | `artisan serve`, `composer run`, `symfony server`, `php -S` | core.runtime |
+| PhpVersionDetector | PHP no PATH, Homebrew, phpenv | process |
 | PortExtractor | Read port from application.properties/yml | core.runtime |
 | ExternalToolLauncher | Open folder/terminal/editor | core.runtime |
 | StateStore | JSON read/write to files | core.runtime |
@@ -67,6 +71,7 @@ Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `d
 - containers: create/update/delete/list, add/remove service, getServicesByContainer, start/stop container, reorderContainers
 - tools: openServiceFolder, openServiceTerminal, openServiceInEditor
 - java: listJdks, getActiveJavaInfo, setServiceJavaVersion, setServiceMvnWrapper, rebuildServices
+- php: listPhpRuntimes, getActivePhpInfo, setServicePhpVersion
 - js/spring config: setServiceScript, setServicePort, resetServicePort
 - ports: checkPortFree, killPort
 

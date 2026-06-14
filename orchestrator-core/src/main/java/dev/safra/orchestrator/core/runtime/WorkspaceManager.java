@@ -31,6 +31,8 @@ public class WorkspaceManager {
   private final ProjectScanner scanner;
   private final JsProjectScanner jsScanner;
   private final StandaloneJsScanner standaloneScanner;
+  private final PhpProjectScanner phpScanner;
+  private final StandalonePhpScanner standalonePhpScanner;
   private final BiConsumer<String, JsonNode> emitEvent;
 
   private Workspace workspace;
@@ -50,6 +52,8 @@ public class WorkspaceManager {
     this.scanner = new ProjectScanner(store, portExtractor, logsDir);
     this.jsScanner = new JsProjectScanner(om, logsDir);
     this.standaloneScanner = new StandaloneJsScanner(logsDir);
+    this.phpScanner = new PhpProjectScanner(om, logsDir);
+    this.standalonePhpScanner = new StandalonePhpScanner(logsDir);
   }
 
   public Workspace getWorkspace() {
@@ -119,6 +123,8 @@ public class WorkspaceManager {
       Path p = Path.of(root).toAbsolutePath().normalize();
       importedPaths.add(p);
       found.addAll(scanner.scanRoot(p, workspace.getExcludeDirs()));
+      found.addAll(phpScanner.scanRoot(p, workspace.getExcludeDirs()));
+      found.addAll(standalonePhpScanner.scanRoot(p, workspace.getExcludeDirs()));
       found.addAll(jsScanner.scanRoot(p, workspace.getExcludeDirs()));
       found.addAll(standaloneScanner.scanRoot(p, workspace.getExcludeDirs()));
     }
@@ -179,6 +185,8 @@ public class WorkspaceManager {
     List<ServiceDefinition> found = new ArrayList<>();
     for (String r : workspace.getRoots()) {
       found.addAll(scanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
+      found.addAll(phpScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
+      found.addAll(standalonePhpScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
       found.addAll(jsScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
       found.addAll(standaloneScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
     }
@@ -230,20 +238,58 @@ public class WorkspaceManager {
           .toList();
       sd.getDefinition().setContainerIds(new ArrayList<>(valid));
     }
-    refreshDynamicJsMetadata();
+    refreshDynamicProjectMetadata();
     persistWorkspace();
     emitEvent.accept("workspace", om.valueToTree(workspace));
     return buildSortedServiceList();
   }
 
-  public void refreshDynamicJsMetadata() {
+  public void refreshDynamicProjectMetadata() {
     boolean changed = false;
-    for (ServiceDescriptor descriptor : services.values()) changed |= refreshDynamicJsMetadata(descriptor.getDefinition());
-    if (changed) persistWorkspace();
+    for (ServiceDescriptor descriptor : services.values()) {
+      changed |= refreshDynamicProjectMetadata(descriptor.getDefinition());
+    }
+    if (changed) {
+      persistWorkspace();
+    }
+  }
+
+  public void refreshDynamicJsMetadata() {
+    refreshDynamicProjectMetadata();
+  }
+
+  public boolean refreshDynamicProjectMetadata(ServiceDefinition def) {
+    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
+      return false;
+    }
+    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      return refreshDynamicPhpMetadata(def);
+    }
+    return refreshDynamicJsMetadata(def);
+  }
+
+  public boolean refreshDynamicPhpMetadata(ServiceDefinition def) {
+    if (def == null || !PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      return false;
+    }
+    List<String> beforeScripts = def.getAvailableScripts() == null ? List.of() : new ArrayList<>(def.getAvailableScripts());
+    Integer beforePort = def.getDetectedPort();
+    String beforeStrategy = def.getPortStrategy();
+    String beforeSelected = def.getSelectedScript();
+    List<String> beforeCommand = def.getCommand() == null ? List.of() : new ArrayList<>(def.getCommand());
+    phpScanner.refreshServiceDefinition(def);
+    return !beforeScripts.equals(def.getAvailableScripts() == null ? List.of() : def.getAvailableScripts())
+        || !java.util.Objects.equals(beforePort, def.getDetectedPort())
+        || !java.util.Objects.equals(beforeStrategy, def.getPortStrategy())
+        || !java.util.Objects.equals(beforeSelected, def.getSelectedScript())
+        || !beforeCommand.equals(def.getCommand() == null ? List.of() : def.getCommand());
   }
 
   public boolean refreshDynamicJsMetadata(ServiceDefinition def) {
-    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) return false;
+    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT
+        || PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      return false;
+    }
     List<String> beforeScripts = def.getAvailableScripts() == null ? List.of() : new ArrayList<>(def.getAvailableScripts());
     Integer beforePort = def.getDetectedPort();
     String beforeStrategy = def.getPortStrategy();

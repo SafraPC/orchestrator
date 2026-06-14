@@ -15,7 +15,8 @@ public final class ServiceViewMapper {
     return new ServiceView(
         definition.getName(), definition.getPath(), definition.getCommand(), definition.getLogFile(),
         definition.getEnv(), definition.getDetectedPort(), definition.getCustomPort(), definition.getPortStrategy(),
-        definition.getJavaHome(), definition.getJavaVersion(), definition.getContainerIds(),
+        definition.getJavaHome(), definition.getJavaVersion(), definition.getPhpHome(), definition.getPhpVersion(),
+        definition.getContainerIds(),
         definition.getProjectType(), definition.getAvailableScripts(), definition.getSelectedScript(),
         MavenWrapperDetector.usesWrapper(definition), MavenWrapperDetector.hasWrapper(definition),
         runtime.getPid(), runtime.getStatus(), runtime.getLastStartAt(), runtime.getLastStopAt(), runtime.getLastError());

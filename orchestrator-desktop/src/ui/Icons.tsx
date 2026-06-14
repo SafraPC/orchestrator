@@ -17,6 +17,12 @@ export const Icon = {
       <path d="M4.2 9.5A4.5 4.5 0 018 4a4.5 4.5 0 013.8 2.1m0 0M11.8 6.5A4.5 4.5 0 018 12a4.5 4.5 0 01-3.8-2.1" />
     </svg>
   ),
+  Download: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M8 2.5v7M5.5 7 8 9.5 10.5 7" />
+      <path d="M3.5 13.5h9" />
+    </svg>
+  ),
   Undo: (p: { className?: string }) => (
     <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
       <path d="M5.5 5H12a2.5 2.5 0 010 5H8" />

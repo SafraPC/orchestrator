@@ -39,6 +39,7 @@ See `src/ui/README.md`. App.tsx uses `useWorkspaceData`, `useServiceFilters`, `u
 - `core()` serializes IPC in a queue (Windows safety)
 - Branch polling: `useServiceBranchPolling` + `listServiceBranches`
 - Tauri-only: folder pickers, `get_runtime_settings`, `set_java_runtime_path`
+- Auto-update: `tauri-plugin-updater` + aviso em `StatusBar`; manifesto `latest.json` na release GitHub
 
 ## Build
 ```bash

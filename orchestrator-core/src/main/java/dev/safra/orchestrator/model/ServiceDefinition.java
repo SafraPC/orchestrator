@@ -17,6 +17,8 @@ public class ServiceDefinition {
   private String portStrategy;
   private String javaHome;
   private String javaVersion;
+  private String phpHome;
+  private String phpVersion;
   private List<String> containerIds;
   private ProjectType projectType;
   private List<String> availableScripts;

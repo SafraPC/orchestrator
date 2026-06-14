@@ -15,6 +15,7 @@ import dev.safra.orchestrator.core.ipc.IpcEventEmitter;
 import dev.safra.orchestrator.core.ipc.IpcParams;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.process.JavaVersionDetector;
+import dev.safra.orchestrator.process.PhpVersionDetector;
 import dev.safra.orchestrator.process.PortProcessKiller;
 import dev.safra.orchestrator.process.ProcessManager;
 
@@ -72,7 +73,7 @@ public class CoreRuntime {
       case "removeRoot" -> workspaceManager.removeRoot(IpcParams.text(params, "root"));
       case "scanRoots" -> workspaceManager.scanRoots();
       case "listServices" -> {
-        workspaceManager.refreshDynamicJsMetadata();
+        workspaceManager.refreshDynamicProjectMetadata();
         yield serviceManager.list();
       }
       case "listServiceBranches" -> om.valueToTree(gitBranchResolver.list(services));
@@ -138,6 +139,24 @@ public class CoreRuntime {
       case "resetServicePort" -> serviceConfigurator.resetServicePort(IpcParams.reqName(params));
       case "setServiceJavaVersion" -> serviceConfigurator.setServiceJavaVersion(
           IpcParams.reqName(params), IpcParams.text(params, "javaVersion"));
+      case "setServicePhpVersion" -> serviceConfigurator.setServicePhpVersion(
+          IpcParams.reqName(params), IpcParams.text(params, "phpVersion"));
+      case "listPhpRuntimes" -> {
+        List<PhpVersionDetector.PhpInfo> runtimes = processManager.getPhpDetector().detectAll();
+        yield om.valueToTree(runtimes);
+      }
+      case "getActivePhpInfo" -> {
+        var info = om.getNodeFactory().objectNode();
+        try {
+          Process p = new ProcessBuilder("php", "-v").redirectErrorStream(true).start();
+          String output = new String(p.getInputStream().readAllBytes());
+          p.waitFor();
+          info.put("output", output.trim());
+        } catch (Exception e) {
+          info.put("output", "");
+        }
+        yield info;
+      }
       case "setServiceMvnWrapper" -> serviceConfigurator.setServiceMvnWrapper(
           IpcParams.reqName(params), IpcParams.bool(params, "enabled", false));
       case "rebuildServices" -> {

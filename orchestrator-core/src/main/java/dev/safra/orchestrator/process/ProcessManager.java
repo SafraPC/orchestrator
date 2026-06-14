@@ -19,6 +19,11 @@ public class ProcessManager {
   private final Duration gracefulTimeout;
   private final Duration killTimeout;
   private final JavaVersionDetector javaDetector = new JavaVersionDetector();
+  private final PhpVersionDetector phpDetector = new PhpVersionDetector();
+
+  private enum RuntimeKind {
+    JAVA, PHP, JS
+  }
 
   public ProcessManager(Duration gracefulTimeout, Duration killTimeout) {
     this.gracefulTimeout = gracefulTimeout;
@@ -27,6 +32,10 @@ public class ProcessManager {
 
   public JavaVersionDetector getJavaDetector() {
     return javaDetector;
+  }
+
+  public PhpVersionDetector getPhpDetector() {
+    return phpDetector;
   }
 
   public long start(ServiceDefinition def) {
@@ -40,7 +49,8 @@ public class ProcessManager {
       }
 
       List<String> cmd = new ArrayList<>(def.getCommand());
-      boolean isJava = def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT;
+      RuntimeKind kind = resolveRuntimeKind(def.getProjectType());
+      boolean isJava = kind == RuntimeKind.JAVA;
       Integer startupPort = resolveStartupPort(def, isJava);
       Map<String, String> startupEnv = buildStartupEnv(def, isJava, startupPort);
 
@@ -59,7 +69,7 @@ public class ProcessManager {
       }
 
       if (!isJava) {
-        cmd = applyCustomJsPort(def, cmd, startupPort);
+        cmd = applyCustomShellPort(def, cmd, startupPort);
         String joined = String.join(" ", cmd);
         if (isWindows()) {
           cmd = List.of("cmd.exe", "/d", "/s", "/c", "chcp 65001>nul && " + joined);
@@ -83,6 +93,9 @@ public class ProcessManager {
       if (isJava) {
         path = setupJavaPath(def, env, path);
       } else {
+        if (kind == RuntimeKind.PHP) {
+          path = setupPhpPath(def, env, path);
+        }
         path = setupNodePath(env, path, workDir);
       }
 
@@ -334,6 +347,66 @@ public class ProcessManager {
       }
     }
     return env;
+  }
+
+  private RuntimeKind resolveRuntimeKind(ProjectType type) {
+    if (type == null || type == ProjectType.SPRING_BOOT) {
+      return RuntimeKind.JAVA;
+    }
+    if (type == ProjectType.LARAVEL || type == ProjectType.SYMFONY
+        || type == ProjectType.PHP_COMPOSER || type == ProjectType.STANDALONE_PHP) {
+      return RuntimeKind.PHP;
+    }
+    return RuntimeKind.JS;
+  }
+
+  private String setupPhpPath(ServiceDefinition def, Map<String, String> env, String path) {
+    String phpBinary = def.getPhpHome();
+    if (phpBinary == null || phpBinary.isBlank()) {
+      phpBinary = phpDetector.resolvePhpBinary(def.getPhpVersion());
+    }
+    if (phpBinary != null && !phpBinary.isBlank()) {
+      Path bin = Path.of(phpBinary);
+      if (Files.isRegularFile(bin)) {
+        path = prependPath(path, bin.getParent().toString());
+      } else if (Files.isDirectory(bin)) {
+        path = prependPath(path, bin.resolve("bin").toString());
+      }
+    }
+    String composerHome = System.getProperty("user.home") + "/.composer/vendor/bin";
+    if (Files.isDirectory(Path.of(composerHome))) {
+      path = prependPath(path, composerHome);
+    }
+    return path;
+  }
+
+  private List<String> applyCustomShellPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
+    List<String> updated = applyCustomJsPort(def, cmd, startupPort);
+    return applyPhpBuiltinPort(def, updated, startupPort);
+  }
+
+  private List<String> applyPhpBuiltinPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
+    if (startupPort == null || def.getCustomPort() == null || !"CLI".equalsIgnoreCase(def.getPortStrategy())) {
+      return cmd;
+    }
+    List<String> updated = new ArrayList<>(cmd);
+    String value = "127.0.0.1:" + startupPort;
+    for (int i = 0; i < updated.size(); i++) {
+      String token = updated.get(i);
+      if (token.startsWith("127.0.0.1:") || token.startsWith("localhost:")) {
+        int colon = token.indexOf(':');
+        updated.set(i, token.substring(0, colon + 1) + startupPort);
+        return updated;
+      }
+      if ("-S".equals(token) && i + 1 < updated.size()) {
+        String next = updated.get(i + 1);
+        if (next.startsWith("127.0.0.1:") || next.startsWith("localhost:")) {
+          updated.set(i + 1, value);
+          return updated;
+        }
+      }
+    }
+    return updated;
   }
 
   private List<String> applyCustomJsPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {

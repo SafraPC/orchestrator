@@ -114,6 +114,7 @@ sha256sum -c CHECKSUMS.sha256
 | `scripts/release/patch-tauri-windows-signing.mjs` | Injeta thumbprint no CI |
 | `scripts/release/generate-checksums.sh` | SHA256 dos instaladores |
 | `scripts/release/sign-linux-deb.sh` | Assina `.deb` com GPG (opcional) |
+| `scripts/release/generate-latest-json.mjs` | Manifesto `latest.json` do auto-update |
 | `.signpath/` | Política e guia SignPath |
 | `.github/workflows/build-cross-platform-artifacts.yml` | Build + assinatura opcional |
 
@@ -124,6 +125,8 @@ sha256sum -c CHECKSUMS.sha256
 - [ ] Windows: artefatos assinados (SignPath ou `WINDOWS_*` secrets)
 - [ ] Linux: `LINUX_GPG_*` secrets definidos ou checksums publicados
 - [ ] `CHECKSUMS.sha256` na release
+- [ ] `latest.json` na release (auto-update Tauri)
+- [ ] Secrets `TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` no GitHub (chave em `orchestrator-updater.key`, não commitar)
 - [ ] Testar instalação limpa em VM Windows 11 e Ubuntu 24.04
 - [ ] Verificar no [VirusTotal](https://www.virustotal.com) se houver alertas; submeter à Microsoft se necessário
 - [ ] Instalar via `scripts/install/install.sh` e `install.ps1` a partir da release

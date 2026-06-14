@@ -34,10 +34,16 @@ public class ServiceConfigurator {
     ServiceDefinition def = sd.getDefinition();
     return finishConfigChange(sd, () -> {
       if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-        JsLaunchCommands.applySelection(def, script);
+        if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+          PhpLaunchCommands.applySelection(def, script);
+        } else {
+          JsLaunchCommands.applySelection(def, script);
+        }
       }
       if (JsLaunchCommands.usesNpmRun(def.getProjectType())) {
         workspaceManager.refreshDynamicJsMetadata(def);
+      } else if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+        workspaceManager.refreshDynamicPhpMetadata(def);
       }
     }, false);
   }
@@ -46,8 +52,12 @@ public class ServiceConfigurator {
     ServiceDescriptor sd = serviceManager.requireService(name);
     ServiceDefinition def = sd.getDefinition();
     if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT)
-      throw new IllegalArgumentException("Troca de porta suportada apenas para projetos frontend");
-    workspaceManager.refreshDynamicJsMetadata(def);
+      throw new IllegalArgumentException("Troca de porta suportada apenas para projetos frontend/PHP");
+    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      workspaceManager.refreshDynamicPhpMetadata(def);
+    } else {
+      workspaceManager.refreshDynamicJsMetadata(def);
+    }
     if (!"CLI".equalsIgnoreCase(def.getPortStrategy()))
       throw new IllegalArgumentException("Este script não permite troca de porta com segurança.");
     return finishConfigChange(sd, () -> {
@@ -56,8 +66,12 @@ public class ServiceConfigurator {
       if (usesCustomPort && !PortProcessKiller.isPortFree(port))
         throw new IllegalStateException("Porta " + port + " está em uso. Libere a porta antes de aplicar.");
       def.setCustomPort(usesCustomPort ? port : null);
-      if (def.getProjectType() == ProjectType.STATIC_HTML && def.getSelectedScript() != null) {
-        JsLaunchCommands.applySelection(def, def.getSelectedScript());
+      if (def.getSelectedScript() != null) {
+        if (def.getProjectType() == ProjectType.STATIC_HTML) {
+          JsLaunchCommands.applySelection(def, def.getSelectedScript());
+        } else if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+          PhpLaunchCommands.applySelection(def, def.getSelectedScript());
+        }
       }
     }, false);
   }
@@ -66,8 +80,25 @@ public class ServiceConfigurator {
     ServiceDescriptor sd = serviceManager.requireService(name);
     ServiceDefinition def = sd.getDefinition();
     if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT)
-      throw new IllegalArgumentException("Reset de porta suportado apenas para projetos frontend");
-    return finishConfigChange(sd, () -> def.setCustomPort(null), false);
+      throw new IllegalArgumentException("Reset de porta suportado apenas para projetos frontend/PHP");
+    return finishConfigChange(sd, () -> {
+      def.setCustomPort(null);
+      if (def.getSelectedScript() != null && PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+        PhpLaunchCommands.applySelection(def, def.getSelectedScript());
+      }
+    }, false);
+  }
+
+  public JsonNode setServicePhpVersion(String name, String version) {
+    ServiceDescriptor sd = serviceManager.requireService(name);
+    return finishConfigChange(sd, () -> {
+      sd.getDefinition().setPhpVersion(version);
+      sd.getDefinition().setPhpHome(null);
+      if (version != null && !version.isBlank()) {
+        String resolved = processManager.getPhpDetector().resolvePhpBinary(version);
+        sd.getDefinition().setPhpHome(resolved);
+      }
+    }, true);
   }
 
   public JsonNode setServiceJavaVersion(String name, String version) {

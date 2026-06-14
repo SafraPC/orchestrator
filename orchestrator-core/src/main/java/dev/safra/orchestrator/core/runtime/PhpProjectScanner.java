@@ -24,6 +24,8 @@ public class PhpProjectScanner {
       ".git", "target", "node_modules", "vendor", ".idea", ".next", "dist", "build", ".turbo", ".cache");
   private static final Set<String> NON_RUNTIME_SCRIPTS = Set.of(
       "test", "tests", "lint", "cs-fix", "cs", "stan", "phpstan", "psalm", "check", "format",
+      "analyse", "analysis", "static-analysis", "qa", "quality", "rector", "pest", "phpunit",
+      "php-cs-fixer", "deptrac", "infection", "fix",
       "post-autoload-dump", "post-root-package-install", "post-create-project-cmd",
       "post-update-cmd", "pre-autoload-dump", "install-cmd");
   private static final Pattern PORT_PATTERN = Pattern.compile("(?:--port=|--port\\s+|127\\.0\\.0\\.1:)(\\d+)");
@@ -180,8 +182,10 @@ public class PhpProjectScanner {
       return ProjectType.LARAVEL;
     }
     if (Files.isRegularFile(dir.resolve("symfony.lock"))
+        || Files.isRegularFile(dir.resolve("bin/console"))
         || hasPackage(root, "symfony/framework")
-        || hasPackage(root, "symfony/symfony")) {
+        || hasPackage(root, "symfony/symfony")
+        || hasPackage(root, "symfony/runtime")) {
       return ProjectType.SYMFONY;
     }
     JsonNode scripts = root.path("scripts");
@@ -204,7 +208,17 @@ public class PhpProjectScanner {
         scripts.add(key);
       }
     }
+    if ((type == ProjectType.PHP_COMPOSER || type == ProjectType.SYMFONY)
+        && hasWebDocroot(dir)
+        && !scripts.contains(PhpLaunchCommands.PHP_BUILTIN_SERVE)) {
+      scripts.add(0, PhpLaunchCommands.PHP_BUILTIN_SERVE);
+    }
     return scripts;
+  }
+
+  private boolean hasWebDocroot(Path dir) {
+    return Files.isRegularFile(dir.resolve("public/index.php"))
+        || Files.isDirectory(dir.resolve("public"));
   }
 
   private List<String> extractComposerScripts(JsonNode root) {
@@ -214,14 +228,14 @@ public class PhpProjectScanner {
     }
     List<String> out = new ArrayList<>();
     scripts.fieldNames().forEachRemaining(name -> {
-      if (isRuntimeScript(name)) {
+      if (isRuntimeScript(name, scripts.get(name))) {
         out.add(name);
       }
     });
     return out;
   }
 
-  private boolean isRuntimeScript(String name) {
+  public static boolean isRuntimeComposerScriptName(String name) {
     String lower = name.toLowerCase(Locale.ROOT);
     if (NON_RUNTIME_SCRIPTS.contains(lower)) {
       return false;
@@ -229,7 +243,41 @@ public class PhpProjectScanner {
     if (lower.startsWith("post-") || lower.startsWith("pre-")) {
       return false;
     }
+    if (lower.contains("analys") || lower.contains("stan") || lower.contains("lint")
+        || lower.contains("test") || lower.contains("format") || lower.contains("cs-fix")) {
+      return false;
+    }
     return true;
+  }
+
+  private boolean isRuntimeScript(String name, JsonNode scriptNode) {
+    if (!isRuntimeComposerScriptName(name)) {
+      return false;
+    }
+    String body = scriptBody(scriptNode).toLowerCase(Locale.ROOT);
+    if (body.contains("phpstan") || body.contains("psalm") || body.contains("phpunit")
+        || body.contains("pest ") || body.contains("php-cs-fixer") || body.contains("rector")
+        || body.contains("deptrac") || body.contains("infection")) {
+      return false;
+    }
+    return true;
+  }
+
+  private String scriptBody(JsonNode scriptNode) {
+    if (scriptNode == null || scriptNode.isNull()) {
+      return "";
+    }
+    if (scriptNode.isTextual()) {
+      return scriptNode.asText("");
+    }
+    if (scriptNode.isArray()) {
+      StringBuilder sb = new StringBuilder();
+      for (JsonNode entry : scriptNode) {
+        sb.append(entry.asText("")).append(" ");
+      }
+      return sb.toString();
+    }
+    return scriptNode.toString();
   }
 
   private boolean hasPackage(JsonNode root, String pkg) {
@@ -248,7 +296,9 @@ public class PhpProjectScanner {
   }
 
   private int extractPort(Path dir, JsonNode root, String selectedScript, ProjectType type) {
-    if (PhpLaunchCommands.ARTISAN_SERVE.equals(selectedScript) || PhpLaunchCommands.SYMFONY_SERVE.equals(selectedScript)) {
+    if (PhpLaunchCommands.ARTISAN_SERVE.equals(selectedScript)
+        || PhpLaunchCommands.SYMFONY_SERVE.equals(selectedScript)
+        || PhpLaunchCommands.PHP_BUILTIN_SERVE.equals(selectedScript)) {
       Integer envPort = readEnvPort(dir);
       if (envPort != null) {
         return envPort;

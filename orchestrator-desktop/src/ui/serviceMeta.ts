@@ -38,7 +38,8 @@ export function getScriptMenuLabel(projectType?: ProjectType): string {
 export function formatScriptLabel(scriptId: string, projectType?: ProjectType): string {
   if (scriptId === "artisan:serve") return "artisan serve";
   if (scriptId === "symfony:serve") return "symfony serve";
-  if (usesPhpScripts(projectType) && scriptId !== "artisan:serve" && scriptId !== "symfony:serve") {
+  if (scriptId === "php:serve") return "php -S (public)";
+  if (usesPhpScripts(projectType) && scriptId !== "artisan:serve" && scriptId !== "symfony:serve" && scriptId !== "php:serve") {
     return `composer run ${scriptId}`;
   }
   return scriptId;

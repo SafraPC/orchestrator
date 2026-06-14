@@ -4,22 +4,7 @@ import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icons";
 import { Tooltip } from "./Tooltip";
 import { formatBranchLabel, getServicePort, isPhpProject } from "./serviceMeta";
-
-const TECH_BADGE: Record<string, { icon: keyof typeof Icon; color: string; label: string }> = {
-  SPRING_BOOT: { icon: "Java", color: "text-orange-400", label: "Java" },
-  NEXT: { icon: "Next", color: "text-white", label: "Next" },
-  NEST: { icon: "Nest", color: "text-red-400", label: "Nest" },
-  REACT: { icon: "ReactIcon", color: "text-cyan-400", label: "React" },
-  VUE: { icon: "Vue", color: "text-emerald-400", label: "Vue" },
-  ANGULAR: { icon: "Code", color: "text-red-500", label: "Angular" },
-  STATIC_HTML: { icon: "Globe", color: "text-amber-400", label: "HTML" },
-  STANDALONE_JS: { icon: "Code", color: "text-yellow-400", label: "JS" },
-  LARAVEL: { icon: "Code", color: "text-red-400", label: "Laravel" },
-  SYMFONY: { icon: "Code", color: "text-violet-400", label: "Symfony" },
-  PHP_COMPOSER: { icon: "Code", color: "text-indigo-400", label: "PHP" },
-  STANDALONE_PHP: { icon: "Code", color: "text-indigo-300", label: "PHP" },
-  UNKNOWN: { icon: "Box", color: "text-slate-400", label: "Node" },
-};
+import { techVisual } from "./techMeta";
 
 function uptime(at: string | null | undefined): string | null {
   if (!at) return null;
@@ -235,7 +220,7 @@ function MvnWrapperBadge() {
 
 function TechBadge(props: { projectType?: ProjectType; javaVersion?: string | null; phpVersion?: string | null }) {
   const type = props.projectType ?? "SPRING_BOOT";
-  const badge = TECH_BADGE[type];
+  const badge = techVisual(props.projectType);
   if (!badge) return null;
   const Ic = Icon[badge.icon];
   let label = badge.label;

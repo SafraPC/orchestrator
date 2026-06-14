@@ -11,6 +11,7 @@ import dev.safra.orchestrator.model.ServiceDefinition;
 public final class PhpLaunchCommands {
   public static final String ARTISAN_SERVE = "artisan:serve";
   public static final String SYMFONY_SERVE = "symfony:serve";
+  public static final String PHP_BUILTIN_SERVE = "php:serve";
   private static final int DEFAULT_PORT = 8000;
 
   private PhpLaunchCommands() {
@@ -30,7 +31,9 @@ public final class PhpLaunchCommands {
   }
 
   public static boolean isInternalScript(String scriptId) {
-    return ARTISAN_SERVE.equals(scriptId) || SYMFONY_SERVE.equals(scriptId);
+    return ARTISAN_SERVE.equals(scriptId)
+        || SYMFONY_SERVE.equals(scriptId)
+        || PHP_BUILTIN_SERVE.equals(scriptId);
   }
 
   public static void applySelection(ServiceDefinition def, String selected) {
@@ -49,6 +52,10 @@ public final class PhpLaunchCommands {
     }
     if (SYMFONY_SERVE.equals(selected)) {
       def.setCommand(symfonyServeCommand(port, def.getPath()));
+      return;
+    }
+    if (PHP_BUILTIN_SERVE.equals(selected)) {
+      def.setCommand(builtinServerCommand(resolvePublicDocroot(Path.of(def.getPath())), port));
       return;
     }
     if (type == ProjectType.STANDALONE_PHP) {

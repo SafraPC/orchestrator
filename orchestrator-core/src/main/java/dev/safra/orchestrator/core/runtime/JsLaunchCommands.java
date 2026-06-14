@@ -59,16 +59,7 @@ public final class JsLaunchCommands {
   }
 
   public static int defaultPort(ProjectType type) {
-    if (type == ProjectType.ANGULAR) {
-      return 4200;
-    }
-    if (type == ProjectType.NEXT) {
-      return 3000;
-    }
-    if (type == ProjectType.STATIC_HTML) {
-      return DEFAULT_STATIC_PORT;
-    }
-    return DEFAULT_STATIC_PORT;
+    return JsFrameworkDetector.defaultPort(type);
   }
 
   public static String defaultPortStrategy(ProjectType type) {
@@ -78,7 +69,7 @@ public final class JsLaunchCommands {
     if (type == ProjectType.STANDALONE_JS) {
       return "UNSUPPORTED";
     }
-    return "UNSUPPORTED";
+    return JsFrameworkDetector.defaultPortStrategy(type);
   }
 
   private static int resolvePort(ServiceDefinition def) {

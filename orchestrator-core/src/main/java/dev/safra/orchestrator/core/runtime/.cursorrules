@@ -1,0 +1,8 @@
+# orchestrator-core — runtime
+
+## JS framework layer
+`core/runtime/JsFrameworkDetector.java` — detecção de stack JS/TS, porta padrão, `portStrategy` e scripts preferidos.
+
+Ordem de detecção: Next → Nest → Remix → Angular → Astro → Svelte → Fastify → Hono → Express → Vue → React → UNKNOWN.
+
+`JsProjectScanner` delega detecção e usa `npm run` para todos os tipos acima.

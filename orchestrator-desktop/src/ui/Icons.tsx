@@ -239,4 +239,45 @@ export const Icon = {
       <path d="M1 1l7 13L15 1h-3l-4 7-4-7H1z" opacity="0.3" />
     </svg>
   ),
+  Angular: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 1.2L1.8 3.6v8.8L8 15.2l6.2-2.8V3.6L8 1.2zm0 1.4l4.8 2.1v6.6L8 13.4l-4.8-2.1V4.7L8 2.6z" />
+      <path d="M8 4.8L5.6 10h1l.5-1.2h2.8l.5 1.2h1L8 4.8zm0 1.8l.9 2.1H7.1L8 6.6z" />
+    </svg>
+  ),
+  Express: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M2.5 10.5V5.5L8 2.5l5.5 3v5L8 13.5 2.5 10.5zm1.2-1.1L8 11.8l4.3-2.4V6.6L8 4.2 3.7 6.6v2.8z" opacity="0.35" />
+      <path d="M4.5 8.2h7v1H4.5v-1zm0 2.2h4.5v1H4.5v-1z" />
+    </svg>
+  ),
+  Astro: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M10.8 10.5L8.9 5.2 7.6 9.1H5.1l3.5-5.9h1.2l2 5.3 1.8-3.4h1.3L10.8 10.5z" />
+      <path d="M8 1.5l6.5 12H9.4l-.9-2H5.5l-.9 2H1.5L8 1.5z" opacity="0.25" />
+    </svg>
+  ),
+  Svelte: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M12.1 11.4c-.8 1.1-2.4 1.6-4.1 1.2-1.8-.4-3.1-1.6-3.4-3-.3-1.3.3-2.4 1.4-3.1.5-.3 1.1-.5 1.7-.6-.1-.4-.3-.8-.6-1.1-1-.9-2.6-.7-3.6.5C2.8 6.7 2.5 8.6 3.4 10c1 1.5 3 2.4 5.1 2.4 1.4 0 2.7-.4 3.6-1z" />
+      <path d="M11.8 4.6c.8-1.1 2.4-1.6 4.1-1.2 1.8.4 3.1 1.6 3.4 3 .3 1.3-.3 2.4-1.4 3.1-.5.3-1.1.5-1.7.6.1.4.3.8.6 1.1 1 .9 2.6.7 3.6-.5.8-1.1 1.1-3 .2-4.4-1-1.5-3-2.4-5.1-2.4-1.4 0-2.7.4-3.6 1z" opacity="0.55" />
+    </svg>
+  ),
+  Remix: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M3 4.5h10v1.8L8.2 11.5H6.8L11 6.3H3V4.5z" />
+      <path d="M3 11.8h4.2v1.2H3v-1.2z" opacity="0.7" />
+    </svg>
+  ),
+  Fastify: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M9.2 1.2L6.1 8.1H3.4l5.8 6.7V9.4l2.1-4.5 2.2 4.5v5.4L14.6 8.1h-2.7L9.2 1.2z" />
+    </svg>
+  ),
+  Hono: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 2.2c2.2 1.8 3.6 3.8 3.6 5.8 0 2.4-1.6 4.3-3.6 5.8-2-1.5-3.6-3.4-3.6-5.8 0-2 1.4-4 3.6-5.8z" opacity="0.35" />
+      <path d="M8 4.5c1.2 1 2 2.1 2 3.5s-.8 2.5-2 3.5c-1.2-1-2-2.1-2-3.5s.8-2.5 2-3.5z" />
+    </svg>
+  ),
 };

@@ -56,9 +56,13 @@ public class StandalonePhpScanner {
           }
           Path projectDir = dir;
           String docroot = ".";
-          if ("public".equals(dir.getFileName() == null ? "" : dir.getFileName().toString())) {
+          String dirName = dir.getFileName() == null ? "" : dir.getFileName().toString();
+          if ("public".equals(dirName)) {
             Path parent = dir.getParent();
-            if (parent != null && !hasManifest(parent)) {
+            if (parent != null && (hasManifest(parent) || PhpProjectScanner.isPhpOwnedDirectory(parent))) {
+              return FileVisitResult.CONTINUE;
+            }
+            if (parent != null) {
               projectDir = parent;
               docroot = "public";
             }

@@ -137,7 +137,8 @@ public final class WorkspaceDefinitionSync {
     if (available == null || available.isEmpty()) {
       return null;
     }
-    if (preferred != null && !preferred.isBlank() && available.contains(preferred)) {
+    if (preferred != null && !preferred.isBlank() && available.contains(preferred)
+        && PhpProjectScanner.isRuntimeComposerScriptName(preferred)) {
       return preferred;
     }
     if (available.contains(PhpLaunchCommands.ARTISAN_SERVE)) {
@@ -150,6 +151,15 @@ public final class WorkspaceDefinitionSync {
     }
     if (available.contains(PhpLaunchCommands.SYMFONY_SERVE)) {
       return PhpLaunchCommands.SYMFONY_SERVE;
+    }
+    if (available.contains(PhpLaunchCommands.PHP_BUILTIN_SERVE)) {
+      return PhpLaunchCommands.PHP_BUILTIN_SERVE;
+    }
+    for (String script : available) {
+      if (PhpProjectScanner.isRuntimeComposerScriptName(script)
+          && !PhpLaunchCommands.isInternalScript(script)) {
+        return script;
+      }
     }
     return available.get(0);
   }

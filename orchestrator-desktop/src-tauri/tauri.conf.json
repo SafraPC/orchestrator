@@ -32,8 +32,8 @@
     "homepage": "https://github.com/SafraPC/orchestrator",
     "license": "MIT",
     "copyright": "Copyright (c) 2026 Leandro Safra",
-    "shortDescription": "Desktop orchestration for local Spring and JavaScript projects.",
-    "longDescription": "Import local Spring and JavaScript projects, organize them into logical containers, start and stop services, and follow logs from a single desktop application.",
+    "shortDescription": "Desktop app to run and manage local dev servers: Spring Boot, Laravel, Symfony, React, Next.js, NestJS, Angular, Vue, Node.js, and static HTML/PHP.",
+    "longDescription": "Orchestrator is a cross-platform desktop control plane for local development. Import project folders, auto-detect Java, JavaScript, and PHP stacks, group services into containers, start and stop dev servers, follow logs, change scripts and ports, kill stuck ports, and receive auto-updates. Ideal for developers running multiple microservices, frontends, and APIs on localhost without Docker.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

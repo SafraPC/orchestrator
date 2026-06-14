@@ -1,11 +1,13 @@
-# Orchestrator
+# Orchestrator — Desktop app to run and manage local dev servers
 
 <p align="center">
-  <strong>Professional desktop control plane for local development services.</strong>
+  <strong>Professional desktop control plane for local development services.</strong><br>
+  Start, stop, and monitor Spring Boot, Node.js, PHP, and static projects from one place — no Docker required.
 </p>
 
 <p align="center">
-  Import Spring Boot, React, Next.js, NestJS, and Vue projects. Start faster, organize better, and keep local environments under control.
+  Import folders, auto-detect projects, group services into containers, stream logs, switch scripts and ports, and free stuck ports.<br>
+  Built for developers who run <strong>multiple local servers</strong> (APIs, frontends, Laravel, Symfony) and want a single <strong>orchestrator for dev environments</strong> on macOS, Windows, and Linux.
 </p>
 
 <p align="center">
@@ -29,32 +31,60 @@
 
 ## What It Delivers
 
-- Centralized control for local services on macOS, Windows, and Linux.
-- Clean grouping with logical containers.
+- **One app for many stacks** — Java (Spring Boot), JavaScript/TypeScript (React, Next.js, NestJS, Angular, Vue), PHP (Laravel, Symfony, Composer), and plain HTML/JS/PHP files.
+- Centralized control for local dev servers on macOS, Windows, and Linux.
+- Clean grouping with logical containers (not Docker — logical start/stop groups).
 - Fast start, stop, and restart flows with keyboard shortcuts.
 - Live logs with search, filtering, and per-service or per-container views.
 - Branch visibility for Git-based projects.
-- Per-service customization: Java version, Maven wrapper, scripts, ports.
+- Per-service customization: Java/PHP runtime, Maven wrapper, npm/Composer scripts, ports.
 - Built-in port killer to recover stuck local ports.
+- **Auto-update** — packaged apps check GitHub Releases and notify when a new version is available.
 - Persistent workspace state across sessions.
+
+## Who It Is For
+
+| You want to… | Orchestrator helps with… |
+| --- | --- |
+| Run several Spring Boot microservices locally | Detect `pom.xml`, ports, JDK per service, `mvnw` toggle |
+| Start a Laravel app (`artisan serve` or `composer run dev`) | PHP scanner, script menu, Vite via Composer when needed |
+| Keep React/Next/Vue/Nest/Angular dev servers organized | `npm run` scripts, tech filters, container batch start |
+| Serve static HTML or a standalone `.js` / `index.php` | Built-in static server / `php -S` without extra setup |
+| Replace many terminal tabs with one dashboard | Containers, aggregated logs, status bar, shortcuts |
+
+> **Looking for:** *local server manager*, *dev environment orchestrator*, *run multiple npm/Spring/PHP projects*, *alternative to juggling terminals* — this repo is aimed at that workflow.
 
 ## Supported Stacks
 
-| Stack | Detection |
-| --- | --- |
-| Spring Boot | `pom.xml` |
-| Next.js | `package.json` (`next`) |
-| NestJS | `package.json` (`@nestjs/core`) |
-| Angular | `package.json` (`@angular/core`) |
-| React | `package.json` (`react`) |
-| Vue | `package.json` (`vue`) |
-| Node (genérico) | `package.json` com scripts npm |
-| HTML estático | pasta com `.html`/`.htm` sem `package.json` |
-| JavaScript avulso | `.js`/`.mjs`/`.cjs` executável sem `package.json` |
-| Laravel | `composer.json` + `artisan` |
-| Symfony | `composer.json` + `symfony.lock` ou `symfony/*` |
-| PHP (Composer) | `composer.json` com scripts de desenvolvimento |
-| PHP avulso | `index.php` sem `composer.json` |
+### Java
+
+| Stack | Detection | Default run |
+| --- | --- | --- |
+| Spring Boot | `pom.xml` | `mvn spring-boot:run` / `./mvnw` |
+
+### JavaScript & frontend
+
+| Stack | Detection | Default run |
+| --- | --- | --- |
+| Next.js | `package.json` (`next`) | `npm run` (dev/start) |
+| NestJS | `package.json` (`@nestjs/core`) | `npm run` |
+| Angular | `package.json` (`@angular/core`) | `npm run` |
+| React | `package.json` (`react`) | `npm run` |
+| Vue | `package.json` (`vue`) | `npm run` |
+| Node (generic) | `package.json` with npm scripts | `npm run` |
+| Static HTML | `.html`/`.htm` without `package.json` | `npx serve` |
+| Standalone JS | `.js`/`.mjs`/`.cjs` (e.g. `server.js`) | `node` |
+
+### PHP
+
+| Stack | Detection | Default run |
+| --- | --- | --- |
+| Laravel | `composer.json` + `artisan` | `php artisan serve` or `composer run dev` |
+| Symfony | `composer.json` + `symfony.lock` / `symfony/*` | `symfony server:start` or `php -S` |
+| PHP (Composer) | `composer.json` with dev scripts | `composer run` |
+| Standalone PHP | `index.php` without `composer.json` | `php -S` |
+
+Laravel projects with both `composer.json` and `package.json` are registered **once** as PHP (Vite/npm can run via `composer run dev`).
 
 ## Feature Tour
 
@@ -92,11 +122,15 @@ Switch the log panel to follow every service inside a container, color-tagged pe
 
 ### Run or change any script
 
-For Node-based projects, pick any script defined in `package.json`. For Spring Boot, toggle between system Maven and the project's `mvnw` wrapper directly from the service menu.
+Pick **npm scripts** (React, Next, Nest, Angular, Vue), **Composer scripts** or `artisan serve` (Laravel), or toggle Maven wrapper (`mvnw`) for Spring Boot — from the service context menu.
 
 <p align="center">
   <img alt="Run or change any script" src="./docs/screenshots/run-alter-any-script.png" width="80%">
 </p>
+
+### Auto-update
+
+Installed builds check [GitHub Releases](https://github.com/SafraPC/orchestrator/releases/latest) for signed updates and show a notice in the status bar when a newer version is available.
 
 ### Kill stuck ports
 
@@ -166,9 +200,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
 
 | Scenario | Required |
 | --- | --- |
-| Open desktop app | Java 17+ |
+| Open desktop app | Java 17+ on `PATH` (or set JDK in Settings) |
 | Run Spring services | Project-compatible JDK and Maven or `mvnw` |
-| Run JavaScript services | Project-compatible Node.js |
+| Run JavaScript services | Node.js + npm (for `npm run` / `npx`) |
+| Run PHP services | PHP + Composer (`composer install` in project) |
 | Develop this repository | Java 17+, Maven, Node.js, Rust stable |
 
 Notes:
@@ -284,3 +319,13 @@ Official Tauri prerequisites:
 ## License
 
 This project is available under [`LICENSE`](./LICENSE).
+
+---
+
+<p align="center">
+  <sub>
+    Keywords: orchestrator, local development server, dev server manager, run Spring Boot locally,
+    Laravel artisan serve, Symfony dev server, npm monorepo, multiple microservices,
+    Tauri desktop app, JavaScript PHP Java local environment, port manager, devops localhost.
+  </sub>
+</p>

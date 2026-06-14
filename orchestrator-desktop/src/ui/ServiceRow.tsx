@@ -11,6 +11,10 @@ const TECH_BADGE: Record<string, { icon: keyof typeof Icon; color: string; label
   NEST: { icon: "Nest", color: "text-red-400", label: "Nest" },
   REACT: { icon: "ReactIcon", color: "text-cyan-400", label: "React" },
   VUE: { icon: "Vue", color: "text-emerald-400", label: "Vue" },
+  ANGULAR: { icon: "Code", color: "text-red-500", label: "Angular" },
+  STATIC_HTML: { icon: "Globe", color: "text-amber-400", label: "HTML" },
+  STANDALONE_JS: { icon: "Code", color: "text-yellow-400", label: "JS" },
+  UNKNOWN: { icon: "Box", color: "text-slate-400", label: "Node" },
 };
 
 function uptime(at: string | null | undefined): string | null {

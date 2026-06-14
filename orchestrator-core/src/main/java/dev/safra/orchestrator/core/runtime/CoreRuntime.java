@@ -2,7 +2,6 @@ package dev.safra.orchestrator.core.runtime;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,10 +11,11 @@ import java.util.function.BiConsumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
+import dev.safra.orchestrator.core.ipc.IpcEventEmitter;
+import dev.safra.orchestrator.core.ipc.IpcParams;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.process.JavaVersionDetector;
+import dev.safra.orchestrator.process.PortProcessKiller;
 import dev.safra.orchestrator.process.ProcessManager;
 
 public class CoreRuntime {
@@ -26,13 +26,14 @@ public class CoreRuntime {
 
   private final WorkspaceManager workspaceManager;
   private final ServiceManager serviceManager;
+  private final ServiceConfigurator serviceConfigurator;
   private final ContainerManager containerManager;
   private final LogManager logManager;
   private final ExternalToolLauncher launcher;
   private final ProcessManager processManager;
   private final GitBranchResolver gitBranchResolver;
 
-  public CoreRuntime(Path stateDir, ObjectMapper om, TriEventEmitter eventEmitter) {
+  public CoreRuntime(Path stateDir, ObjectMapper om, IpcEventEmitter eventEmitter) {
     this.om = om;
     this.emitEvent = (ev, payload) -> eventEmitter.emit(om, ev, payload);
 
@@ -51,6 +52,7 @@ public class CoreRuntime {
     this.serviceManager = new ServiceManager(om, processManager, logManager, emitEvent, services,
         () -> workspaceManager.persistRuntime(), () -> workspaceManager.persistWorkspace(),
         () -> workspaceManager.getWorkspace());
+    this.serviceConfigurator = new ServiceConfigurator(om, serviceManager, workspaceManager, processManager, emitEvent);
     this.containerManager = new ContainerManager(om, () -> workspaceManager.getWorkspace(),
         () -> workspaceManager.persistWorkspace());
 
@@ -64,224 +66,80 @@ public class CoreRuntime {
     return switch (method) {
       case "ping" -> om.getNodeFactory().textNode("pong");
       case "getWorkspace" -> om.valueToTree(workspaceManager.getWorkspace());
-      case "setExcludeDirs" -> {
-        List<String> ex = new ArrayList<>();
-        if (params != null && params.has("excludeDirs") && params.get("excludeDirs").isArray()) {
-          for (JsonNode n : params.get("excludeDirs"))
-            ex.add(n.asText());
-        }
-        yield workspaceManager.setExcludeDirs(ex);
-      }
-      case "importRootAndScan" -> workspaceManager.importRootAndScan(
-          params != null && params.hasNonNull("root") ? params.get("root").asText() : null);
-      case "importRootsAndScan" -> {
-        List<String> roots = new ArrayList<>();
-        if (params != null && params.has("roots") && params.get("roots").isArray()) {
-          for (JsonNode n : params.get("roots"))
-            roots.add(n.asText());
-        }
-        yield workspaceManager.importRootsAndScan(roots);
-      }
-      case "removeRoot" -> workspaceManager.removeRoot(
-          params != null && params.hasNonNull("root") ? params.get("root").asText() : null);
+      case "setExcludeDirs" -> workspaceManager.setExcludeDirs(IpcParams.stringList(params, "excludeDirs"));
+      case "importRootAndScan" -> workspaceManager.importRootAndScan(IpcParams.text(params, "root"));
+      case "importRootsAndScan" -> workspaceManager.importRootsAndScan(IpcParams.stringList(params, "roots"));
+      case "removeRoot" -> workspaceManager.removeRoot(IpcParams.text(params, "root"));
       case "scanRoots" -> workspaceManager.scanRoots();
       case "listServices" -> {
         workspaceManager.refreshDynamicJsMetadata();
         yield serviceManager.list();
       }
       case "listServiceBranches" -> om.valueToTree(gitBranchResolver.list(services));
-      case "startService" -> serviceManager.start(reqName(params));
-      case "stopService" -> serviceManager.stop(reqName(params));
-      case "restartService" -> serviceManager.restart(reqName(params));
+      case "startService" -> serviceManager.start(IpcParams.reqName(params));
+      case "stopService" -> serviceManager.stop(IpcParams.reqName(params));
+      case "restartService" -> serviceManager.restart(IpcParams.reqName(params));
       case "startAll" -> serviceManager.startAll();
       case "stopAll" -> serviceManager.stopAll();
-      case "removeService" -> serviceManager.remove(reqName(params));
-      case "reorderServices" -> {
-        List<String> order = new ArrayList<>();
-        if (params != null && params.has("order") && params.get("order").isArray()) {
-          for (JsonNode n : params.get("order"))
-            order.add(n.asText());
-        }
-        yield workspaceManager.reorderServices(order);
-      }
-      case "reorderContainers" -> {
-        List<String> order = new ArrayList<>();
-        if (params != null && params.has("order") && params.get("order").isArray()) {
-          for (JsonNode n : params.get("order"))
-            order.add(n.asText());
-        }
-        yield workspaceManager.reorderContainers(order);
-      }
+      case "removeService" -> serviceManager.remove(IpcParams.reqName(params));
+      case "reorderServices" -> workspaceManager.reorderServices(IpcParams.stringList(params, "order"));
+      case "reorderContainers" -> workspaceManager.reorderContainers(IpcParams.stringList(params, "order"));
       case "subscribeLogs" -> {
-        String name = reqName(params);
-        int tail = params != null && params.has("tail") ? params.get("tail").asInt(200) : 200;
+        String name = IpcParams.reqName(params);
+        int tail = IpcParams.intOr(params, "tail", 200);
         ServiceDescriptor sd = serviceManager.requireService(name);
         yield logManager.subscribe(name, sd.getDefinition().getLogFile(), tail);
       }
-      case "unsubscribeLogs" -> {
-        String subId = params != null && params.hasNonNull("subId") ? params.get("subId").asText() : null;
-        if (subId == null || subId.isBlank())
-          throw new IllegalArgumentException("params.subId é obrigatório");
-        yield logManager.unsubscribe(subId);
-      }
+      case "unsubscribeLogs" -> logManager.unsubscribe(IpcParams.reqSubId(params));
       case "createContainer" -> containerManager.create(
-          params != null && params.hasNonNull("name") ? params.get("name").asText() : null,
-          params != null && params.hasNonNull("description") ? params.get("description").asText() : "");
+          IpcParams.text(params, "name"),
+          IpcParams.textOr(params, "description", ""));
       case "updateContainer" -> containerManager.update(
-          params != null && params.hasNonNull("id") ? params.get("id").asText() : null,
-          params != null && params.hasNonNull("name") ? params.get("name").asText() : null,
-          params != null && params.hasNonNull("description") ? params.get("description").asText() : null);
+          IpcParams.text(params, "id"),
+          IpcParams.text(params, "name"),
+          IpcParams.text(params, "description"));
       case "deleteContainer" -> {
-        String id = params != null && params.hasNonNull("id") ? params.get("id").asText() : null;
-        JsonNode result = containerManager.delete(id);
+        JsonNode result = containerManager.delete(IpcParams.text(params, "id"));
         emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
         yield result;
       }
       case "listContainers" -> containerManager.list();
       case "addServiceToContainer" -> {
-        containerManager.addService(reqName(params),
-            params != null && params.hasNonNull("containerId") ? params.get("containerId").asText() : null);
+        containerManager.addService(IpcParams.reqName(params), IpcParams.text(params, "containerId"));
         emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
         yield serviceManager.list();
       }
       case "removeServiceFromContainer" -> {
-        containerManager.removeService(reqName(params),
-            params != null && params.hasNonNull("containerId") ? params.get("containerId").asText() : null);
+        containerManager.removeService(IpcParams.reqName(params), IpcParams.text(params, "containerId"));
         emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
         yield serviceManager.list();
       }
-      case "getServicesByContainer" -> serviceManager.getByContainer(
-          params != null && params.hasNonNull("containerId") ? params.get("containerId").asText() : null);
-      case "startContainer" -> serviceManager.startByContainer(
-          params != null && params.hasNonNull("containerId") ? params.get("containerId").asText() : null);
-      case "stopContainer" -> serviceManager.stopByContainer(
-          params != null && params.hasNonNull("containerId") ? params.get("containerId").asText() : null);
-      case "openServiceFolder" -> {
-        ServiceDescriptor sd = serviceManager.requireService(reqName(params));
-        launcher.openFolder(Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize());
-        yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Pasta aberta");
-      }
-      case "openServiceTerminal" -> {
-        ServiceDescriptor sd = serviceManager.requireService(reqName(params));
-        launcher.openTerminal(Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize());
-        yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Terminal aberto");
-      }
-      case "openServiceInEditor" -> {
-        ServiceDescriptor sd = serviceManager.requireService(reqName(params));
-        launcher.openEditor(Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize());
-        yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Editor aberto");
-      }
+      case "getServicesByContainer" -> serviceManager.getByContainer(IpcParams.text(params, "containerId"));
+      case "startContainer" -> serviceManager.startByContainer(IpcParams.text(params, "containerId"));
+      case "stopContainer" -> serviceManager.stopByContainer(IpcParams.text(params, "containerId"));
+      case "openServiceFolder" -> openServicePath(IpcParams.reqName(params), "Pasta aberta", launcher::openFolder);
+      case "openServiceTerminal" -> openServicePath(IpcParams.reqName(params), "Terminal aberto", launcher::openTerminal);
+      case "openServiceInEditor" -> openServicePath(IpcParams.reqName(params), "Editor aberto", launcher::openEditor);
       case "listJdks" -> {
         List<JavaVersionDetector.JdkInfo> jdks = processManager.getJavaDetector().detectAll();
         yield om.valueToTree(jdks);
       }
       case "getActiveJavaInfo" -> {
-        com.fasterxml.jackson.databind.node.ObjectNode info = om.getNodeFactory().objectNode();
+        var info = om.getNodeFactory().objectNode();
         info.put("javaHome", System.getProperty("java.home", ""));
         info.put("javaVersion", System.getProperty("java.version", ""));
         info.put("vendor", System.getProperty("java.vendor", ""));
         info.put("runtimeName", System.getProperty("java.runtime.name", ""));
         yield info;
       }
-      case "setServiceScript" -> {
-        String name = reqName(params);
-        String script = params != null && params.hasNonNull("script") ? params.get("script").asText() : null;
-        ServiceDescriptor sd = serviceManager.requireService(name);
-        ServiceDefinition def = sd.getDefinition();
-        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
-        if (wasRunning) serviceManager.stop(name);
-        if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-          String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(script, def.getAvailableScripts());
-          if (selected != null) {
-            def.setSelectedScript(selected);
-            def.setCommand(List.of("npm", "run", selected));
-          }
-        }
-        workspaceManager.refreshDynamicJsMetadata(def);
-        workspaceManager.persistWorkspace();
-        if (wasRunning) serviceManager.start(name);
-        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
-        yield serviceManager.list();
-      }
-      case "setServicePort" -> {
-        String name = reqName(params);
-        int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;
-        if (port < 1 || port > 65535) throw new IllegalArgumentException("params.port inválida");
-        ServiceDescriptor sd = serviceManager.requireService(name);
-        ServiceDefinition def = sd.getDefinition();
-        if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
-          throw new IllegalArgumentException("Troca de porta suportada apenas para projetos frontend");
-        }
-        workspaceManager.refreshDynamicJsMetadata(def);
-        if (!"CLI".equalsIgnoreCase(def.getPortStrategy())) {
-          throw new IllegalArgumentException("Este script não permite troca de porta com segurança.");
-        }
-        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
-        if (wasRunning) serviceManager.stop(name);
-        Integer detectedPort = def.getDetectedPort();
-        boolean usesCustomPort = detectedPort == null || detectedPort != port;
-        if (usesCustomPort && !dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port)) {
-          throw new IllegalStateException("Porta " + port + " está em uso. Libere a porta antes de aplicar.");
-        }
-        def.setCustomPort(usesCustomPort ? port : null);
-        workspaceManager.persistWorkspace();
-        if (wasRunning) serviceManager.start(name);
-        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
-        yield serviceManager.list();
-      }
-      case "resetServicePort" -> {
-        String name = reqName(params);
-        ServiceDescriptor sd = serviceManager.requireService(name);
-        ServiceDefinition def = sd.getDefinition();
-        if (def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
-          throw new IllegalArgumentException("Reset de porta suportado apenas para projetos frontend");
-        }
-        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
-        if (wasRunning) serviceManager.stop(name);
-        def.setCustomPort(null);
-        workspaceManager.persistWorkspace();
-        if (wasRunning) serviceManager.start(name);
-        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
-        yield serviceManager.list();
-      }
-      case "setServiceJavaVersion" -> {
-        String name = reqName(params);
-        String version = params != null && params.hasNonNull("javaVersion") ? params.get("javaVersion").asText() : null;
-        ServiceDescriptor sd = serviceManager.requireService(name);
-        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
-        if (wasRunning) serviceManager.stop(name);
-        sd.getDefinition().setJavaVersion(version);
-        sd.getDefinition().setJavaHome(null);
-        if (version != null && !version.isBlank()) {
-          String resolved = processManager.getJavaDetector().resolveJavaHome(version);
-          sd.getDefinition().setJavaHome(resolved);
-        }
-        workspaceManager.persistWorkspace();
-        workspaceManager.persistRuntime();
-        if (wasRunning) serviceManager.start(name);
-        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
-        yield serviceManager.list();
-      }
-      case "setServiceMvnWrapper" -> {
-        String name = reqName(params);
-        boolean enabled = params != null && params.has("enabled") && params.get("enabled").asBoolean(false);
-        ServiceDescriptor sd = serviceManager.requireService(name);
-        ServiceDefinition def = sd.getDefinition();
-        if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT) {
-          throw new IllegalArgumentException("Wrapper Maven aplicável apenas a projetos Spring Boot");
-        }
-        if (enabled && !MavenWrapperDetector.hasWrapper(def)) {
-          throw new IllegalStateException("Projeto não possui wrapper Maven (mvnw) na pasta.");
-        }
-        boolean wasRunning = sd.getRuntime().getStatus() == dev.safra.orchestrator.model.ServiceStatus.RUNNING;
-        if (wasRunning) serviceManager.stop(name);
-        def.setUseMvnWrapper(enabled);
-        WorkspaceDefinitionSync.applyMvnWrapperPreference(def);
-        workspaceManager.persistWorkspace();
-        if (wasRunning) serviceManager.start(name);
-        emitEvent.accept("service", om.valueToTree(serviceManager.toView(sd)));
-        yield serviceManager.list();
-      }
+      case "setServiceScript" -> serviceConfigurator.setServiceScript(
+          IpcParams.reqName(params), IpcParams.text(params, "script"));
+      case "setServicePort" -> serviceConfigurator.setServicePort(IpcParams.reqName(params), IpcParams.reqPort(params));
+      case "resetServicePort" -> serviceConfigurator.resetServicePort(IpcParams.reqName(params));
+      case "setServiceJavaVersion" -> serviceConfigurator.setServiceJavaVersion(
+          IpcParams.reqName(params), IpcParams.text(params, "javaVersion"));
+      case "setServiceMvnWrapper" -> serviceConfigurator.setServiceMvnWrapper(
+          IpcParams.reqName(params), IpcParams.bool(params, "enabled", false));
       case "rebuildServices" -> {
         serviceManager.stopAll();
         JsonNode result = workspaceManager.rebuildServices();
@@ -289,16 +147,13 @@ public class CoreRuntime {
         yield result;
       }
       case "checkPortFree" -> {
-        int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;
-        if (port < 1 || port > 65535) throw new IllegalArgumentException("params.port inválida");
-        boolean free = dev.safra.orchestrator.process.PortProcessKiller.isPortFree(port);
-        yield om.getNodeFactory().objectNode().put("free", free);
+        int port = IpcParams.reqPort(params);
+        yield om.getNodeFactory().objectNode().put("free", PortProcessKiller.isPortFree(port));
       }
       case "killPort" -> {
-        int port = params != null && params.has("port") ? params.get("port").asInt(-1) : -1;
-        if (port < 1 || port > 65535) throw new IllegalArgumentException("params.port inválida");
+        int port = IpcParams.reqPort(params);
         boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-        dev.safra.orchestrator.process.PortProcessKiller.killPort(port, windows);
+        PortProcessKiller.killPort(port, windows);
         yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Porta " + port + " liberada");
       }
       default -> throw new IllegalArgumentException("Método desconhecido: " + method);
@@ -309,6 +164,12 @@ public class CoreRuntime {
     shutdown.set(true);
     logManager.shutdownAll();
     LogFileWriter.close();
+  }
+
+  private JsonNode openServicePath(String name, String message, java.util.function.Consumer<Path> action) {
+    ServiceDescriptor sd = serviceManager.requireService(name);
+    action.accept(Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize());
+    return om.getNodeFactory().objectNode().put("ok", true).put("message", message);
   }
 
   private void startProcessMonitor() {
@@ -327,17 +188,5 @@ public class CoreRuntime {
     }, "process-monitor");
     t.setDaemon(true);
     t.start();
-  }
-
-  private String reqName(JsonNode params) {
-    String name = params != null && params.hasNonNull("name") ? params.get("name").asText() : null;
-    if (name == null || name.isBlank())
-      throw new IllegalArgumentException("params.name é obrigatório");
-    return name;
-  }
-
-  @FunctionalInterface
-  public interface TriEventEmitter {
-    void emit(ObjectMapper om, String event, JsonNode payload);
   }
 }

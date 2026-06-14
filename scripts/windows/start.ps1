@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $Root
 
 $DepsInfo = & (Join-Path $Root "scripts\windows\ensure-build-deps.ps1")
@@ -19,6 +19,7 @@ if (-not (Test-Path $NodeExe)) {
   $NodeExe = $g.Source
 }
 
+$env:ORCHESTRATOR_SKIP_MVN_CLEAN = $null
 $env:ORCHESTRATOR_VERBOSE_LOGS = "1"
 
 & $NodeExe "$Root\orchestrator-desktop\scripts\run-dev.mjs"

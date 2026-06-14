@@ -356,6 +356,12 @@ public class ProcessManager {
       } else if (token.startsWith("--PORT=")) {
         updated.set(i, "--PORT=" + value);
         changed = true;
+      } else if ("-l".equals(token) && i + 1 < updated.size()) {
+        updated.set(i + 1, value);
+        changed = true;
+      } else if (token.startsWith("-l=")) {
+        updated.set(i, "-l=" + value);
+        changed = true;
       }
     }
     if (!changed && updated.size() >= 2 && "npm".equalsIgnoreCase(updated.get(0)) && "run".equalsIgnoreCase(updated.get(1))) {

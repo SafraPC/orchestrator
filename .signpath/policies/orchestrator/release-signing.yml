@@ -1,0 +1,3 @@
+github-policies:
+  build:
+    disallow_reruns: false

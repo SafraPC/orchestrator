@@ -3,7 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $CoreDir = Join-Path $Root "orchestrator-core"
 $DesktopDir = Join-Path $Root "orchestrator-desktop"
 $JarPath = Join-Path $CoreDir "target\orchestrator-core-standalone.jar"

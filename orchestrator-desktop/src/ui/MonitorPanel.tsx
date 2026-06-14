@@ -7,7 +7,7 @@ import { Icon } from "./Icons";
 import type { ToastType } from "./Toast";
 import { Tooltip } from "./Tooltip";
 
-type CoreEvent = { event: string; payload: Record<string, unknown> };
+import type { CoreEvent } from "../api/events";
 type MonitorLine = { service: string; line: string };
 
 const BADGE_COLORS = [

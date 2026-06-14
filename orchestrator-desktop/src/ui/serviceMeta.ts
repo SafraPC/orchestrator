@@ -1,4 +1,4 @@
-import type { ServiceBranchMapDto, ServiceDto } from "../api/types";
+import type { ServiceBranchMapDto, ServiceDto, ProjectType } from "../api/types";
 
 export function getServicePort(service: ServiceDto): string | null {
   const port = service.customPort ?? service.detectedPort ?? service.env?.SERVER_PORT ?? service.env?.PORT ?? null;
@@ -7,6 +7,20 @@ export function getServicePort(service: ServiceDto): string | null {
 
 export function canChangeServicePort(service: ServiceDto): boolean {
   return service.portStrategy === "CLI";
+}
+
+export function usesNpmScripts(projectType?: ProjectType): boolean {
+  return !!projectType
+    && projectType !== "SPRING_BOOT"
+    && projectType !== "STATIC_HTML"
+    && projectType !== "STANDALONE_JS";
+}
+
+export function getScriptMenuLabel(projectType?: ProjectType): string {
+  if (projectType === "STATIC_HTML") return "Arquivo HTML";
+  if (projectType === "STANDALONE_JS") return "Arquivo JavaScript";
+  if (usesNpmScripts(projectType)) return "npm script";
+  return "Entrada";
 }
 
 export function formatBranchLabel(branch: string): string {

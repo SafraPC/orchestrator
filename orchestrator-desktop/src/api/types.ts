@@ -1,6 +1,15 @@
 export type ServiceStatus = "RUNNING" | "STOPPED" | "ERROR";
 
-export type ProjectType = "SPRING_BOOT" | "NEXT" | "NEST" | "REACT" | "VUE" | "UNKNOWN";
+export type ProjectType =
+  | "SPRING_BOOT"
+  | "NEXT"
+  | "NEST"
+  | "REACT"
+  | "VUE"
+  | "ANGULAR"
+  | "STATIC_HTML"
+  | "STANDALONE_JS"
+  | "UNKNOWN";
 
 export type ServiceDto = {
   name: string;

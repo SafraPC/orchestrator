@@ -1,0 +1,49 @@
+# orchestrator-desktop — Tauri + React
+
+## Layout
+```
+src/
+  api/           client.ts (IPC), types.ts (DTOs)
+  ui/            React components + hooks (see ui/README.md)
+src-tauri/src/
+  main.rs        Tauri commands
+  core_bridge.rs Java process, stdin/stdout IPC, core_event
+  java_runtime.rs spawn core, PATH/JAVA_HOME
+  java_env.rs    Java 17+ validation
+```
+
+## IPC flow
+React `api.*` → `invoke("core_request")` → CoreBridge → Java → response / log events via `useCoreEvents`.
+
+Contract table: repo `docs/reference/IPC.md`. Integration flow: `docs/integration/INTEGRATION.md`.
+
+## Rust notes
+- `core_bridge`: single session mutex for request lifecycle; recv timeout kills JVM; one retry on shutdown/transport errors
+- stdout reader: `read_until` + `from_utf8_lossy` (not line iterator)
+- Core not started in Tauri `.setup`
+- stderr trace: `ORCHESTRATOR_CORE_TRACE=1`, log file `desktop-logs/core.stderr.log`
+
+## Dev commands
+| Command | Effect |
+| --- | --- |
+| `npm run dev` | Vite only |
+| `npm run dev:full` | Maven JAR + Vite + tauri dev (same as `scripts/unix/start.sh`) |
+| `npm run verify:core-ipc` | Smoke test against JAR |
+
+`devUrl` must stay `http://127.0.0.1:5173`; Vite `--host 127.0.0.1`.
+
+## Hooks
+See `src/ui/README.md`. App.tsx uses `useWorkspaceData`, `useServiceFilters`, `useCoreEvents`, `useServiceBranchPolling`, `useServiceShortcuts`, `useJavaRuntime`.
+
+## API client
+- `core()` serializes IPC in a queue (Windows safety)
+- Branch polling: `useServiceBranchPolling` + `listServiceBranches`
+- Tauri-only: folder pickers, `get_runtime_settings`, `set_java_runtime_path`
+
+## Build
+```bash
+npm run build
+cd src-tauri && cargo check
+```
+
+Full desktop bundle: `scripts/unix/build.sh` / `scripts/windows/build.ps1`.

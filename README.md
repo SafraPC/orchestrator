@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img alt="Orchestrator running" src="./docs/running.png" width="92%">
+  <img alt="Orchestrator running" src="./docs/screenshots/running.png" width="92%">
 </p>
 
 ---
@@ -43,10 +43,14 @@
 | Stack | Detection |
 | --- | --- |
 | Spring Boot | `pom.xml` |
-| Next.js | `package.json` |
-| NestJS | `package.json` |
-| React | `package.json` |
-| Vue | `package.json` |
+| Next.js | `package.json` (`next`) |
+| NestJS | `package.json` (`@nestjs/core`) |
+| Angular | `package.json` (`@angular/core`) |
+| React | `package.json` (`react`) |
+| Vue | `package.json` (`vue`) |
+| Node (genérico) | `package.json` com scripts npm |
+| HTML estático | pasta com `.html`/`.htm` sem `package.json` |
+| JavaScript avulso | `.js`/`.mjs`/`.cjs` executável sem `package.json` |
 
 ## Feature Tour
 
@@ -55,7 +59,7 @@
 Organize services into logical containers (frontends, backends, full apps, sandboxes). Start or stop a whole container with one click.
 
 <p align="center">
-  <img alt="Create container" src="./docs/create-container.png" width="80%">
+  <img alt="Create container" src="./docs/screenshots/create-container.png" width="80%">
 </p>
 
 ### Filter by technology
@@ -63,7 +67,7 @@ Organize services into logical containers (frontends, backends, full apps, sandb
 The tech filter narrows the service list to a single stack — useful when juggling dozens of microservices and frontends.
 
 <p align="center">
-  <img alt="Filter by tech" src="./docs/filter-by-tech.png" width="80%">
+  <img alt="Filter by tech" src="./docs/screenshots/filter-by-tech.png" width="80%">
 </p>
 
 ### Per-service logs
@@ -71,7 +75,7 @@ The tech filter narrows the service list to a single stack — useful when juggl
 Inspect a single service with timestamps, search, line wrapping, and font size controls.
 
 <p align="center">
-  <img alt="See unique service logs" src="./docs/see-unique-service-logs.png" width="85%">
+  <img alt="See unique service logs" src="./docs/screenshots/see-unique-service-logs.png" width="85%">
 </p>
 
 ### Aggregated container logs
@@ -79,7 +83,7 @@ Inspect a single service with timestamps, search, line wrapping, and font size c
 Switch the log panel to follow every service inside a container, color-tagged per service, in one stream.
 
 <p align="center">
-  <img alt="See container logs" src="./docs/se-container-logs.png" width="85%">
+  <img alt="See container logs" src="./docs/screenshots/se-container-logs.png" width="85%">
 </p>
 
 ### Run or change any script
@@ -87,7 +91,7 @@ Switch the log panel to follow every service inside a container, color-tagged pe
 For Node-based projects, pick any script defined in `package.json`. For Spring Boot, toggle between system Maven and the project's `mvnw` wrapper directly from the service menu.
 
 <p align="center">
-  <img alt="Run or change any script" src="./docs/run-alter-any-script.png" width="80%">
+  <img alt="Run or change any script" src="./docs/screenshots/run-alter-any-script.png" width="80%">
 </p>
 
 ### Kill stuck ports
@@ -95,7 +99,7 @@ For Node-based projects, pick any script defined in `package.json`. For Spring B
 Free a port that another process is holding without leaving the app. One click in the toolbar, type the port, done.
 
 <p align="center">
-  <img alt="Kill ports easily" src="./docs/kill-ports-easily.png" width="70%">
+  <img alt="Kill ports easily" src="./docs/screenshots/kill-ports-easily.png" width="70%">
 </p>
 
 ### Customize the experience
@@ -103,7 +107,7 @@ Free a port that another process is holding without leaving the app. One click i
 Zoom, font size, line wrap, Java runtime path, cache rebuild — all available from the settings panel.
 
 <p align="center">
-  <img alt="Customize yourself" src="./docs/customize-yourself.png" width="70%">
+  <img alt="Customize yourself" src="./docs/screenshots/customize-yourself.png" width="70%">
 </p>
 
 ### One-shot configuration
@@ -111,7 +115,7 @@ Zoom, font size, line wrap, Java runtime path, cache rebuild — all available f
 Point Orchestrator at one or more project roots and it scans, classifies, and registers every service automatically.
 
 <p align="center">
-  <img alt="Easy configuration" src="./docs/easy-config.png" width="85%">
+  <img alt="Easy configuration" src="./docs/screenshots/easy-config.png" width="85%">
 </p>
 
 ## Download
@@ -214,18 +218,22 @@ IPC shapes:
 
 ## Local Development
 
+Contributor guide: [`docs/guides/DEVELOPING.md`](./docs/guides/DEVELOPING.md). Integration: [`docs/integration/INTEGRATION.md`](./docs/integration/INTEGRATION.md). Scripts: [`scripts/README.md`](./scripts/README.md).
+
+**Container** in this app means a logical group of services for start/stop and logs — not Docker.
+
 ### Start development mode
 
 macOS and Linux:
 
 ```bash
-./start.sh
+./scripts/unix/start.sh
 ```
 
 Windows:
 
 ```powershell
-.\start.ps1
+.\scripts\windows\start.cmd
 ```
 
 ### Build native bundles
@@ -233,13 +241,13 @@ Windows:
 macOS and Linux:
 
 ```bash
-./build.sh
+./scripts/unix/build.sh
 ```
 
 Windows:
 
 ```powershell
-.\build.ps1
+.\scripts\windows\build.ps1
 ```
 
 Generated bundles:
@@ -250,10 +258,12 @@ orchestrator-desktop/src-tauri/target/release/bundle/
 
 ### Development notes
 
-- `start.sh` and `build.sh` now bootstrap local Java, Maven, and Node on macOS and Linux when needed.
-- `start.ps1` and `build.ps1` do the same on Windows.
+- `npm run dev` (inside `orchestrator-desktop`) runs **Vite only**. For the full desktop app with Java core, use `scripts/unix/start.sh`, `scripts/windows/start.cmd`, or `npm run dev:full`.
+- `scripts/unix/verify.sh` (or `scripts/windows/verify.ps1`) runs Maven compile, `cargo check`, and `npm run build` in one step.
+- Unix scripts bootstrap local Java, Maven, and Node when needed; Windows scripts do the same via `scripts/windows/`.
 - Linux desktop builds still need Tauri native packages for the distro.
-- Manual build details remain in [`BUILD.md`](./BUILD.md).
+- Manual build: [`docs/guides/BUILD.md`](./docs/guides/BUILD.md). IPC: [`docs/reference/IPC.md`](./docs/reference/IPC.md). Integration: [`docs/integration/INTEGRATION.md`](./docs/integration/INTEGRATION.md).
+Instalação confiável: [`docs/guides/TRUST_AND_SIGNING.md`](./docs/guides/TRUST_AND_SIGNING.md) e [`SIGNPATH.md`](./SIGNPATH.md).
 
 Official Tauri prerequisites:
 

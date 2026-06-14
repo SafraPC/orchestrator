@@ -6,7 +6,7 @@ import { Icon } from "./Icons";
 import { MonitorPanel } from "./MonitorPanel";
 import { Tooltip } from "./Tooltip";
 
-type CoreEvent = { event: string; payload: Record<string, unknown> };
+import type { CoreEvent } from "../api/events";
 
 function classify(line: string): "error" | "warn" | "info" | "debug" | "status" | "normal" {
   if (line.includes("[STATUS]")) return "status";

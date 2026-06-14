@@ -1,0 +1,40 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: orchestrator-desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Maven compile (core)
+        run: mvn -q -DskipTests compile
+        working-directory: orchestrator-core
+
+      - name: npm ci + build (desktop)
+        run: |
+          npm ci
+          npm run build
+        working-directory: orchestrator-desktop
+
+      - name: cargo check (tauri)
+        run: cargo check
+        working-directory: orchestrator-desktop/src-tauri

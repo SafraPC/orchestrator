@@ -87,8 +87,7 @@ public class JsProjectScanner {
       def.setDetectedPort(metadata.detectedPort());
       def.setPortStrategy(metadata.portStrategy());
       def.setSelectedScript(metadata.selectedScript());
-      def.setCommand(List.of("npm", "run", metadata.selectedScript()));
-
+      def.setCommand(JsLaunchCommands.npmRunCommand(metadata.selectedScript()));
       return def;
     } catch (Exception e) {
       return null;
@@ -97,6 +96,9 @@ public class JsProjectScanner {
 
   public void refreshServiceDefinition(ServiceDefinition def) {
     if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
+      return;
+    }
+    if (def.getProjectType() == ProjectType.STATIC_HTML || def.getProjectType() == ProjectType.STANDALONE_JS) {
       return;
     }
     try {
@@ -108,7 +110,7 @@ public class JsProjectScanner {
       def.setDetectedPort(metadata.detectedPort());
       def.setPortStrategy(metadata.portStrategy());
       def.setSelectedScript(metadata.selectedScript());
-      def.setCommand(List.of("npm", "run", metadata.selectedScript()));
+      def.setCommand(JsLaunchCommands.npmRunCommand(metadata.selectedScript()));
     } catch (Exception ignored) {
     }
   }
@@ -121,11 +123,13 @@ public class JsProjectScanner {
 
     if (isMonorepoRoot(root)) return null;
 
-    ProjectType type = detectType(root);
-    if (type == null) return null;
-
     List<String> scripts = extractScripts(root);
     if (scripts.isEmpty()) return null;
+
+    ProjectType type = detectFramework(root);
+    if (type == null) {
+      type = ProjectType.UNKNOWN;
+    }
 
     String selectedScript = selectScript(scripts, type, preferredScript);
     String scriptCommand = root.path("scripts").path(selectedScript).asText("");
@@ -133,8 +137,8 @@ public class JsProjectScanner {
         type,
         scripts,
         selectedScript,
-        extractPort(root, dir, selectedScript),
-        resolvePortStrategy(scriptCommand));
+        extractPort(root, dir, selectedScript, type),
+        resolvePortStrategy(scriptCommand, type));
   }
 
   private boolean isMonorepoRoot(JsonNode root) {
@@ -145,12 +149,13 @@ public class JsProjectScanner {
     return deps.has("lerna") || deps.has("nx");
   }
 
-  private ProjectType detectType(JsonNode root) {
+  private ProjectType detectFramework(JsonNode root) {
     JsonNode deps = root.path("dependencies");
     JsonNode devDeps = root.path("devDependencies");
 
     if (hasDep(deps, "next") || hasDep(devDeps, "next")) return ProjectType.NEXT;
     if (hasDep(deps, "@nestjs/core") || hasDep(devDeps, "@nestjs/core")) return ProjectType.NEST;
+    if (hasDep(deps, "@angular/core") || hasDep(devDeps, "@angular/core")) return ProjectType.ANGULAR;
     if (hasDep(deps, "vue") || hasDep(devDeps, "vue")) return ProjectType.VUE;
     if (hasDep(deps, "react") || hasDep(devDeps, "react")) return ProjectType.REACT;
     return null;
@@ -168,7 +173,7 @@ public class JsProjectScanner {
     return out;
   }
 
-  private int extractPort(JsonNode root, Path dir, String selectedScript) {
+  private int extractPort(JsonNode root, Path dir, String selectedScript, ProjectType type) {
     JsonNode scripts = root.path("scripts");
     if (scripts.isObject() && scripts.has(selectedScript)) {
       Matcher selectedMatch = PORT_FLAG.matcher(scripts.get(selectedScript).asText(""));
@@ -196,18 +201,22 @@ public class JsProjectScanner {
         }
       } catch (Exception ignored) {}
     }
+    if (type == ProjectType.ANGULAR) return 4200;
     if (hasDep(root.path("dependencies"), "vite") || hasDep(root.path("devDependencies"), "vite")) return 5173;
-    return 3000;
+    return JsLaunchCommands.defaultPort(type);
   }
 
-  private String resolvePortStrategy(String scriptCommand) {
+  private String resolvePortStrategy(String scriptCommand, ProjectType type) {
     String cmd = scriptCommand.toLowerCase();
     if (cmd.contains("vite")) return "CLI";
     if (cmd.contains("next ")) return "CLI";
     if (cmd.startsWith("next")) return "CLI";
     if (cmd.contains("nuxt")) return "CLI";
+    if (cmd.contains("ng serve") || cmd.contains("@angular/cli")) return "CLI";
     if (cmd.contains("webpack serve") || cmd.contains("webpack-dev-server")) return "CLI";
     if (cmd.contains("vue-cli-service serve")) return "CLI";
+    if (cmd.contains("react-scripts start")) return "ENV";
+    if (type == ProjectType.ANGULAR && cmd.contains("serve")) return "CLI";
     return "UNSUPPORTED";
   }
 
@@ -218,6 +227,10 @@ public class JsProjectScanner {
     if (type == ProjectType.NEST) {
       if (scripts.contains("start:dev")) return "start:dev";
       if (scripts.contains("start:debug")) return "start:debug";
+    }
+    if (type == ProjectType.ANGULAR) {
+      if (scripts.contains("start")) return "start";
+      if (scripts.contains("serve")) return "serve";
     }
     if (scripts.contains("dev")) return "dev";
     if (scripts.contains("start")) return "start";

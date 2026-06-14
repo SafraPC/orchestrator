@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 if not exist "%~dp0start.ps1" (
-  echo start.ps1 ausente ao lado de start.cmd.
+  echo start.ps1 ausente em scripts\windows\.
   exit /b 1
 )
 set "ORCHESTRATOR_SKIP_MVN_CLEAN="

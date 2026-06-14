@@ -41,6 +41,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Import Windows code signing certificate
+        if: runner.os == 'Windows' && secrets.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          New-Item -ItemType Directory -Force -Path certificate | Out-Null
+          Set-Content -Path certificate/tempCert.txt -Value $env:WINDOWS_CERTIFICATE
+          certutil -decode certificate/tempCert.txt certificate/certificate.pfx
+          Remove-Item certificate/tempCert.txt
+          $secure = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $secure
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -58,6 +72,15 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Import Linux GPG key
+        if: runner.os == 'Linux' && secrets.LINUX_GPG_PRIVATE_KEY != ''
+        shell: bash
+        env:
+          LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
+        run: |
+          echo "$LINUX_GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --list-secret-keys
+
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -71,7 +94,8 @@ jobs:
             "$WEBKIT_PKG" \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            dpkg-sig
 
       - name: Build orchestrator-core jar
         run: mvn -q -DskipTests clean package
@@ -89,6 +113,25 @@ jobs:
         run: npm run build
         working-directory: orchestrator-desktop
 
+      - name: Enable Linux package signing
+        if: runner.os == 'Linux' && secrets.LINUX_GPG_KEY_ID != ''
+        shell: bash
+        env:
+          LINUX_GPG_KEY_ID: ${{ secrets.LINUX_GPG_KEY_ID }}
+          LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
+        run: |
+          echo "SIGN=1" >> "$GITHUB_ENV"
+          echo "SIGN_KEY=$LINUX_GPG_KEY_ID" >> "$GITHUB_ENV"
+          echo "APPIMAGETOOL_SIGN_PASSPHRASE=$LINUX_GPG_PASSPHRASE" >> "$GITHUB_ENV"
+          echo "APPIMAGETOOL_FORCE_SIGN=1" >> "$GITHUB_ENV"
+
+      - name: Configure Windows Authenticode signing
+        if: runner.os == 'Windows' && (secrets.WINDOWS_CERTIFICATE != '' || secrets.WINDOWS_CERTIFICATE_THUMBPRINT != '')
+        env:
+          WINDOWS_CERTIFICATE_THUMBPRINT: ${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
+        run: node ./scripts/release/patch-tauri-windows-signing.mjs
+
       - name: Build Tauri bundles
         shell: bash
         run: |
@@ -103,18 +146,69 @@ jobs:
           fi
         working-directory: orchestrator-desktop
 
+      - name: Sign deb packages
+        if: runner.os == 'Linux' && secrets.LINUX_GPG_KEY_ID != ''
+        shell: bash
+        env:
+          LINUX_GPG_KEY_ID: ${{ secrets.LINUX_GPG_KEY_ID }}
+        run: |
+          shopt -s nullglob
+          for deb in orchestrator-desktop/src-tauri/target/release/bundle/deb/*.deb; do
+            chmod +x scripts/release/sign-linux-deb.sh
+            ./scripts/release/sign-linux-deb.sh "$deb"
+          done
+
+      - name: Upload Windows installers for SignPath
+        if: runner.os == 'Windows'
+        id: upload-windows-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers-unsigned
+          path: |
+            orchestrator-desktop/src-tauri/target/release/bundle/msi/*.msi
+            orchestrator-desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Sign Windows installers with SignPath
+        if: runner.os == 'Windows' && secrets.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-windows-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-windows
+
+      - name: Replace with SignPath signed Windows installers
+        if: runner.os == 'Windows' && secrets.SIGNPATH_API_TOKEN != ''
+        shell: pwsh
+        run: |
+          $msiDir = "orchestrator-desktop/src-tauri/target/release/bundle/msi"
+          $nsisDir = "orchestrator-desktop/src-tauri/target/release/bundle/nsis"
+          Get-ChildItem -Path signed-windows -Recurse -File | ForEach-Object {
+            if ($_.Extension -eq ".msi") {
+              Copy-Item $_.FullName -Destination (Join-Path $msiDir $_.Name) -Force
+            } elseif ($_.Extension -eq ".exe") {
+              Copy-Item $_.FullName -Destination (Join-Path $nsisDir $_.Name) -Force
+            }
+          }
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
+
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ${{ matrix.artifact_glob }}
+
       - name: Publish release install scripts
         if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Linux'
         uses: softprops/action-gh-release@v2
@@ -122,3 +216,31 @@ jobs:
           files: |
             scripts/install/install.sh
             scripts/install/install.ps1
+
+  checksums:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: "*-installers"
+          merge-multiple: true
+
+      - name: Generate CHECKSUMS.sha256
+        run: |
+          cd artifacts
+          sha256sum $(find . -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \)) | sed 's|^\./||' > CHECKSUMS.sha256
+          cat CHECKSUMS.sha256
+
+      - name: Publish checksums
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/CHECKSUMS.sha256

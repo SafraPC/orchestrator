@@ -1,0 +1,37 @@
+# orchestrator-core — Java IPC engine
+
+## Entry points
+- `dev/safra/orchestrator/core/Main.java` — stdin loop, dispatches to CoreRuntime
+- `dev/safra/orchestrator/core/runtime/CoreRuntime.java` — method switch (IPC contract)
+
+## Packages
+| Package | Responsibility |
+| --- | --- |
+| `core` | Main, Args, Json |
+| `core.ipc` | IpcRequest/Response/Event, IpcParams, IpcEventEmitter |
+| `core.runtime` | Application services: managers, scanners, configurators |
+| `model` | Domain: Workspace (aggregate), ServiceDefinition, ServiceView (read model), Container |
+| `process` | OS/process infrastructure |
+
+## Persistence (`--stateDir`)
+- `workspace.json` — roots, services, containers, removedServices
+- `runtime.json` — per-service pid, status, timestamps
+
+## Critical rules
+- Container delete never removes services — only clears containerIds
+- scanRoots merges containerIds by service name; cleans stale container refs
+- removedServices excluded from scan; importRootAndScan clears the set
+- Ports from application.properties/yml; JS customPort only when portStrategy=CLI
+- listServices re-reads package.json for scripts/port/strategy sync
+
+## IPC
+Full method list: repo `docs/reference/IPC.md`. Flow diagrams: `docs/integration/INTEGRATION.md`.
+
+## Build
+```bash
+mvn -q -DskipTests compile    # quick check
+mvn clean package -DskipTests # standalone JAR → copy to desktop src-tauri/
+```
+
+## Key classes
+WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore

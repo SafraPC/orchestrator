@@ -2,7 +2,8 @@ import { useRef, useState, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../api/client";
-import type { ContainerDto, JdkInfo, ServiceDto } from "../api/types";
+import type { ContainerDto, JdkInfo, ProjectType, ServiceDto } from "../api/types";
+import { getScriptMenuLabel } from "./serviceMeta";
 import { Icon } from "./Icons";
 import { canChangeServicePort } from "./serviceMeta";
 
@@ -114,7 +115,7 @@ export function ContextMenu(props: {
           {isJs && scripts.length > 1 && (
             <>
               <div className="divider my-1" />
-              <SubMenu label="npm script" icon="Terminal" isOpen={openSub === "script"}
+              <SubMenu label={getScriptMenuLabel(s.projectType)} icon="Terminal" isOpen={openSub === "script"}
                 menuRef={menuRef} onEnter={() => cancelClose("script")} onLeave={scheduleClose}>
                 {scripts.map((sc) => {
                   const isActive = activeScript === sc;

@@ -6,5 +6,8 @@ public enum ProjectType {
   NEST,
   REACT,
   VUE,
+  ANGULAR,
+  STATIC_HTML,
+  STANDALONE_JS,
   UNKNOWN
 }

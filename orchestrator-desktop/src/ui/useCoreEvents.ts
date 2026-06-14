@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import type { ServiceDto } from "../api/types";
 
-type CoreEvent = { event: string; payload: unknown };
+import type { CoreEvent } from "../api/events";
 
 export function useCoreEvents(args: {
   refresh: () => Promise<void>;

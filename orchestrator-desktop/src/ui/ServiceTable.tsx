@@ -7,6 +7,7 @@ import { ServicePortModal } from "./ServicePortModal";
 import { ServiceRow } from "./ServiceRow";
 import { getServicePort } from "./serviceMeta";
 import type { ToastType } from "./Toast";
+import { mergeSubsetOrderIds } from "./mergeSubsetOrder";
 import { useDragReorder } from "./useDragReorder";
 
 export function ServiceTable(props: {
@@ -33,18 +34,7 @@ export function ServiceTable(props: {
   const handleReorder = useCallback(
     (reordered: ServiceDto[]) => {
       props.onServicesUpdate?.(reordered);
-      const subNames = new Set(reordered.map((service) => service.name));
-      const otherNames = allSvcs.filter((service) => !subNames.has(service.name)).map((service) => service.name);
-      const merged: string[] = [];
-      let otherIndex = 0;
-      let subIndex = 0;
-      for (const service of allSvcs) {
-        if (subNames.has(service.name)) {
-          if (subIndex < reordered.length) merged.push(reordered[subIndex++].name);
-        } else if (otherIndex < otherNames.length) {
-          merged.push(otherNames[otherIndex++]);
-        }
-      }
+      const merged = mergeSubsetOrderIds(allSvcs, reordered, (service) => service.name);
       void api.reorderServices(merged);
     },
     [allSvcs, props.onServicesUpdate],

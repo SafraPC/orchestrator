@@ -4,7 +4,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -13,11 +12,14 @@ import java.util.function.Supplier;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import dev.safra.orchestrator.core.runtime.JsLaunchCommands;
+import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
-import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceRuntime;
 import dev.safra.orchestrator.model.ServiceStatus;
+import dev.safra.orchestrator.model.ServiceView;
+import dev.safra.orchestrator.model.Workspace;
 import dev.safra.orchestrator.process.ProcessManager;
 import dev.safra.orchestrator.process.StopResult;
 public class ServiceManager {
@@ -52,10 +54,13 @@ public class ServiceManager {
     ServiceRuntime rt = sd.getRuntime();
     ServiceDefinition def = sd.getDefinition();
     if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT
+        && JsLaunchCommands.usesNpmRun(def.getProjectType())
         && def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
       String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(def.getSelectedScript(), def.getAvailableScripts());
       if (selected != null && (def.getSelectedScript() == null || !def.getSelectedScript().equals(selected) || def.getCommand() == null || def.getCommand().isEmpty())) {
-        def.setSelectedScript(selected); def.setCommand(List.of("npm", "run", selected)); persistWorkspace.run();
+        def.setSelectedScript(selected);
+        def.setCommand(JsLaunchCommands.npmRunCommand(selected));
+        persistWorkspace.run();
       }
     }
 
@@ -235,14 +240,7 @@ public class ServiceManager {
   }
 
   public ServiceView toView(ServiceDescriptor sd) {
-    var def = sd.getDefinition();
-    var rt = sd.getRuntime();
-    return new ServiceView(
-        def.getName(), def.getPath(), def.getCommand(), def.getLogFile(),
-        def.getEnv(), def.getDetectedPort(), def.getCustomPort(), def.getPortStrategy(), def.getJavaHome(), def.getJavaVersion(), def.getContainerIds(),
-        def.getProjectType(), def.getAvailableScripts(), def.getSelectedScript(),
-        MavenWrapperDetector.usesWrapper(def), MavenWrapperDetector.hasWrapper(def),
-        rt.getPid(), rt.getStatus(), rt.getLastStartAt(), rt.getLastStopAt(), rt.getLastError());
+    return ServiceViewMapper.fromDescriptor(sd);
   }
 
   private boolean hasContainer(ServiceDescriptor sd, String containerId) {
@@ -262,14 +260,7 @@ public class ServiceManager {
   }
 
   private List<ServiceView> sortedViews(List<ServiceView> views) {
-    List<String> order = workspaceSupplier.get().getServiceOrder();
-    if (order == null || order.isEmpty()) return views;
-    return views.stream()
-        .sorted(Comparator.comparingInt(v -> {
-          int idx = order.indexOf(v.name());
-          return idx >= 0 ? idx : Integer.MAX_VALUE;
-        }))
-        .toList();
+    return ServiceViewMapper.sortByOrder(views, workspaceSupplier.get().getServiceOrder());
   }
 
   private void scheduleHealthCheck(String name, long pid, ServiceDescriptor sd) {

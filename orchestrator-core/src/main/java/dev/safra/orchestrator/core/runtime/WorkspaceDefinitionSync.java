@@ -62,10 +62,9 @@ public final class WorkspaceDefinitionSync {
         def.setCustomPort(prev.getCustomPort());
         if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
           String preferred = prev.getSelectedScript();
-          String runtimeScript = selectRuntimeJsScript(preferred, def.getAvailableScripts());
+          String runtimeScript = WorkspaceDefinitionSync.selectRuntimeJsScript(preferred, def.getAvailableScripts());
           if (runtimeScript != null) {
-            def.setSelectedScript(runtimeScript);
-            def.setCommand(List.of("npm", "run", runtimeScript));
+            JsLaunchCommands.applySelection(def, runtimeScript);
           }
         }
         continue;

@@ -3,7 +3,6 @@ package dev.safra.orchestrator.core.runtime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +19,8 @@ import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.model.ServiceRuntime;
 import dev.safra.orchestrator.model.ServiceStatus;
+import dev.safra.orchestrator.model.ServiceView;
+import dev.safra.orchestrator.model.Workspace;
 
 public class WorkspaceManager {
   private final Path stateDir;
@@ -29,6 +30,7 @@ public class WorkspaceManager {
   private final StateStore store;
   private final ProjectScanner scanner;
   private final JsProjectScanner jsScanner;
+  private final StandaloneJsScanner standaloneScanner;
   private final BiConsumer<String, JsonNode> emitEvent;
 
   private Workspace workspace;
@@ -47,6 +49,7 @@ public class WorkspaceManager {
     Path logsDir = stateDir.resolve("logs");
     this.scanner = new ProjectScanner(store, portExtractor, logsDir);
     this.jsScanner = new JsProjectScanner(om, logsDir);
+    this.standaloneScanner = new StandaloneJsScanner(logsDir);
   }
 
   public Workspace getWorkspace() {
@@ -117,6 +120,7 @@ public class WorkspaceManager {
       importedPaths.add(p);
       found.addAll(scanner.scanRoot(p, workspace.getExcludeDirs()));
       found.addAll(jsScanner.scanRoot(p, workspace.getExcludeDirs()));
+      found.addAll(standaloneScanner.scanRoot(p, workspace.getExcludeDirs()));
     }
 
     Set<String> existingNames = new HashSet<>();
@@ -176,6 +180,7 @@ public class WorkspaceManager {
     for (String r : workspace.getRoots()) {
       found.addAll(scanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
       found.addAll(jsScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
+      found.addAll(standaloneScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
     }
 
     Map<String, ServiceDefinition> byName = new HashMap<>();
@@ -258,13 +263,7 @@ public class WorkspaceManager {
   }
 
   private ServiceView toView(ServiceDescriptor sd) {
-    var d = sd.getDefinition();
-    var r = sd.getRuntime();
-    return new ServiceView(d.getName(), d.getPath(), d.getCommand(), d.getLogFile(),
-        d.getEnv(), d.getDetectedPort(), d.getCustomPort(), d.getPortStrategy(), d.getJavaHome(), d.getJavaVersion(), d.getContainerIds(),
-        d.getProjectType(), d.getAvailableScripts(), d.getSelectedScript(),
-        MavenWrapperDetector.usesWrapper(d), MavenWrapperDetector.hasWrapper(d),
-        r.getPid(), r.getStatus(), r.getLastStartAt(), r.getLastStopAt(), r.getLastError());
+    return ServiceViewMapper.fromDescriptor(sd);
   }
 
   public JsonNode reorderServices(List<String> order) {
@@ -298,15 +297,7 @@ public class WorkspaceManager {
   }
 
   List<ServiceView> sortedViews(List<ServiceView> views) {
-    List<String> order = workspace.getServiceOrder();
-    if (order == null || order.isEmpty())
-      return views;
-    return views.stream()
-        .sorted(Comparator.comparingInt(v -> {
-          int idx = order.indexOf(v.name());
-          return idx >= 0 ? idx : Integer.MAX_VALUE;
-        }))
-        .toList();
+    return ServiceViewMapper.sortByOrder(views, workspace.getServiceOrder());
   }
 
   public void persistWorkspace() {

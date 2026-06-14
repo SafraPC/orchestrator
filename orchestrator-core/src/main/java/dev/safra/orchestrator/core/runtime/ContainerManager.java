@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import dev.safra.orchestrator.model.Container;
 import dev.safra.orchestrator.model.ServiceDefinition;
+import dev.safra.orchestrator.model.Workspace;
 
 public class ContainerManager {
   private final ObjectMapper om;

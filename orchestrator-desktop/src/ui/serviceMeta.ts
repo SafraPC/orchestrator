@@ -1,6 +1,7 @@
 import type { ServiceBranchMapDto, ServiceDto, ProjectType } from "../api/types";
 
 const PHP_TYPES = new Set<ProjectType>(["LARAVEL", "SYMFONY", "PHP_COMPOSER", "STANDALONE_PHP"]);
+const CUSTOM_PHP_COMMAND_PREFIX = "custom:";
 
 export function isPhpProject(projectType?: ProjectType): boolean {
   return !!projectType && PHP_TYPES.has(projectType);
@@ -27,6 +28,16 @@ export function usesPhpScripts(projectType?: ProjectType): boolean {
   return isPhpProject(projectType) && projectType !== "STANDALONE_PHP";
 }
 
+export function isCustomPhpCommand(scriptId?: string | null): boolean {
+  return !!scriptId?.startsWith(CUSTOM_PHP_COMMAND_PREFIX);
+}
+
+export function customPhpCommandText(scriptId?: string | null): string | null {
+  const value = scriptId ?? "";
+  if (!isCustomPhpCommand(value)) return null;
+  return value.slice(CUSTOM_PHP_COMMAND_PREFIX.length).trim();
+}
+
 export function getScriptMenuLabel(projectType?: ProjectType): string {
   if (projectType === "STATIC_HTML") return "Arquivo HTML";
   if (projectType === "STANDALONE_JS") return "Arquivo JavaScript";
@@ -36,6 +47,8 @@ export function getScriptMenuLabel(projectType?: ProjectType): string {
 }
 
 export function formatScriptLabel(scriptId: string, projectType?: ProjectType): string {
+  const customCommand = customPhpCommandText(scriptId);
+  if (customCommand) return customCommand;
   if (scriptId === "artisan:serve") return "artisan serve";
   if (scriptId === "symfony:serve") return "symfony serve";
   if (scriptId === "php:serve") return "php -S (public)";

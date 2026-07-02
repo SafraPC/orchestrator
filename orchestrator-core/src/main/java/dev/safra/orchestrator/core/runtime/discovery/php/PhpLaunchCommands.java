@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.php;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +15,7 @@ public final class PhpLaunchCommands {
   public static final String ARTISAN_SERVE = "artisan:serve";
   public static final String SYMFONY_SERVE = "symfony:serve";
   public static final String PHP_BUILTIN_SERVE = "php:serve";
+  public static final String CUSTOM_COMMAND_PREFIX = "custom:";
   private static final List<String> PHP_WEB_RUNTIME_OPTIONS = List.of(
       "-d", "display_errors=0",
       "-d", "log_errors=1");
@@ -42,6 +43,25 @@ public final class PhpLaunchCommands {
         || PHP_BUILTIN_SERVE.equals(scriptId);
   }
 
+  public static boolean isCustomCommandScript(String scriptId) {
+    return scriptId != null && scriptId.startsWith(CUSTOM_COMMAND_PREFIX)
+        && !scriptId.substring(CUSTOM_COMMAND_PREFIX.length()).isBlank();
+  }
+
+  public static String customCommandScript(String command) {
+    if (command == null || command.isBlank()) {
+      throw new IllegalArgumentException("Comando PHP é obrigatório");
+    }
+    return CUSTOM_COMMAND_PREFIX + command.trim();
+  }
+
+  public static String customCommandText(String scriptId) {
+    if (!isCustomCommandScript(scriptId)) {
+      return "";
+    }
+    return scriptId.substring(CUSTOM_COMMAND_PREFIX.length()).trim();
+  }
+
   public static void applySelection(ServiceDefinition def, String selected) {
     if (def == null || selected == null || selected.isBlank()) {
       return;
@@ -50,17 +70,25 @@ public final class PhpLaunchCommands {
     if (!isPhpProject(type)) {
       return;
     }
-    def.setSelectedScript(selected);
+    String normalized = selected.trim();
+    def.setSelectedScript(normalized);
+    if (isCustomCommandScript(normalized)) {
+      def.setCommand(customCommand(normalized));
+      def.setPortStrategy("UNSUPPORTED");
+      def.setCustomPort(null);
+      return;
+    }
+    def.setPortStrategy(defaultPortStrategy(type));
     int port = resolvePort(def);
-    if (ARTISAN_SERVE.equals(selected)) {
+    if (ARTISAN_SERVE.equals(normalized)) {
       def.setCommand(artisanServeCommand(port));
       return;
     }
-    if (SYMFONY_SERVE.equals(selected)) {
+    if (SYMFONY_SERVE.equals(normalized)) {
       def.setCommand(symfonyServeCommand(port, def.getPath()));
       return;
     }
-    if (PHP_BUILTIN_SERVE.equals(selected)) {
+    if (PHP_BUILTIN_SERVE.equals(normalized)) {
       def.setCommand(builtinServerCommand(resolvePublicDocroot(Path.of(def.getPath())), port));
       return;
     }
@@ -68,8 +96,10 @@ public final class PhpLaunchCommands {
       def.setCommand(builtinServerCommand(resolveDocroot(def), port));
       return;
     }
-    if (def.getAvailableScripts() != null && def.getAvailableScripts().contains(selected)) {
-      def.setCommand(composerRunCommand(selected));
+    if (def.getAvailableScripts() != null && def.getAvailableScripts().contains(normalized)) {
+      def.setCommand(composerRunCommand(normalized));
+      def.setPortStrategy("UNSUPPORTED");
+      def.setCustomPort(null);
     }
   }
 
@@ -90,6 +120,14 @@ public final class PhpLaunchCommands {
 
   public static List<String> builtinServerCommand(String docroot, int port) {
     return phpWebCommand("-S", "localhost:" + port, "-t", docroot);
+  }
+
+  public static List<String> customCommand(String scriptId) {
+    String command = customCommandText(scriptId);
+    if (command.isBlank()) {
+      throw new IllegalArgumentException("Comando PHP é obrigatório");
+    }
+    return List.of(command);
   }
 
   private static List<String> phpWebCommand(String... args) {

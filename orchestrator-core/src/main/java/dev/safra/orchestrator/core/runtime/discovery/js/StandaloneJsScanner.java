@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.js;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -51,6 +51,9 @@ public class StandaloneJsScanner {
           if (SKIP_DIRS.contains(name) || excluded.contains(name)) {
             return FileVisitResult.SKIP_SUBTREE;
           }
+          if (hasProjectManifest(dir)) {
+            return FileVisitResult.SKIP_SUBTREE;
+          }
           return FileVisitResult.CONTINUE;
         }
 
@@ -60,7 +63,7 @@ public class StandaloneJsScanner {
           if (dir == null) {
             return FileVisitResult.CONTINUE;
           }
-          if (hasPackageJson(dir) || hasPom(dir)) {
+          if (hasProjectManifest(dir)) {
             return FileVisitResult.CONTINUE;
           }
           String fileName = file.getFileName().toString();
@@ -108,12 +111,10 @@ public class StandaloneJsScanner {
     }
   }
 
-  private boolean hasPackageJson(Path dir) {
-    return Files.isRegularFile(dir.resolve("package.json"));
-  }
-
-  private boolean hasPom(Path dir) {
-    return Files.isRegularFile(dir.resolve("pom.xml"));
+  private boolean hasProjectManifest(Path dir) {
+    return Files.isRegularFile(dir.resolve("package.json"))
+        || Files.isRegularFile(dir.resolve("composer.json"))
+        || Files.isRegularFile(dir.resolve("pom.xml"));
   }
 
   private boolean isHtmlEntry(String name) {

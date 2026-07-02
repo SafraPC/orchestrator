@@ -1,17 +1,11 @@
-package dev.safra.orchestrator.core.runtime;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
+package dev.safra.orchestrator.core.runtime.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import dev.safra.orchestrator.core.runtime.discovery.js.JsLaunchCommands;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.core.runtime.logs.LogManager;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceDefinitionSync;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
@@ -21,6 +15,16 @@ import dev.safra.orchestrator.model.ServiceView;
 import dev.safra.orchestrator.model.Workspace;
 import dev.safra.orchestrator.process.ProcessManager;
 import dev.safra.orchestrator.process.StopResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 public class ServiceManager {
   private final ObjectMapper om;
@@ -168,18 +172,27 @@ public class ServiceManager {
   }
 
   public JsonNode remove(String name) {
-    ServiceDescriptor sd = services.remove(name);
-    if (sd != null) {
-      Long pid = sd.getRuntime().getPid();
-      if (pid != null)
-        processManager.stop(pid);
-      if (sd.getDefinition().getContainerIds() != null)
-        sd.getDefinition().getContainerIds().clear();
-      logManager.removeSubscriptionsFor(name);
-    }
+    detachService(name);
     Workspace ws = workspaceSupplier.get();
     ws.getServices().removeIf(d -> d.getName().equals(name));
     ws.getRemovedServices().add(name);
+    persistWorkspace.run();
+    persistRuntime.run();
+    emitServicesChanged();
+    return list();
+  }
+
+  public JsonNode removeMany(List<String> names) {
+    if (names == null || names.isEmpty()) {
+      throw new IllegalArgumentException("params.names é obrigatório");
+    }
+    Set<String> toRemove = new HashSet<>(names);
+    for (String name : toRemove) {
+      detachService(name);
+    }
+    Workspace ws = workspaceSupplier.get();
+    ws.getServices().removeIf(d -> toRemove.contains(d.getName()));
+    ws.getRemovedServices().addAll(toRemove);
     persistWorkspace.run();
     persistRuntime.run();
     emitServicesChanged();
@@ -217,6 +230,24 @@ public class ServiceManager {
         out.add(StopResult.failed(
             sd.getRuntime().getPid() != null ? sd.getRuntime().getPid() : 0,
             "Erro ao parar: " + e.getMessage()));
+      }
+    }
+    emitServicesChanged();
+    return om.valueToTree(out);
+  }
+
+  public JsonNode restartByContainer(String containerId) {
+    List<ServiceView> out = new ArrayList<>();
+    List<ServiceDescriptor> toRestart = services.values().stream()
+        .filter(sd -> hasContainer(sd, containerId))
+        .toList();
+
+    for (ServiceDescriptor sd : toRestart) {
+      try {
+        JsonNode restarted = restart(sd.getDefinition().getName());
+        out.add(om.treeToValue(restarted, ServiceView.class));
+      } catch (Exception e) {
+        out.add(toView(sd));
       }
     }
     emitServicesChanged();
@@ -261,6 +292,21 @@ public class ServiceManager {
   private boolean hasContainer(ServiceDescriptor sd, String containerId) {
     ServiceDefinition def = sd.getDefinition();
     return def.getContainerIds() != null && def.getContainerIds().contains(containerId);
+  }
+
+  private void detachService(String name) {
+    ServiceDescriptor sd = services.remove(name);
+    if (sd == null) {
+      return;
+    }
+    Long pid = sd.getRuntime().getPid();
+    if (pid != null) {
+      processManager.stop(pid);
+    }
+    if (sd.getDefinition().getContainerIds() != null) {
+      sd.getDefinition().getContainerIds().clear();
+    }
+    logManager.removeSubscriptionsFor(name);
   }
 
   private void emitServiceChanged(String name) {

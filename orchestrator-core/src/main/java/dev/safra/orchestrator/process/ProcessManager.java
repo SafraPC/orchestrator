@@ -314,6 +314,9 @@ public class ProcessManager {
   }
 
   private Integer resolveStartupPort(ServiceDefinition def, boolean isJava) {
+    if (!isJava && !"CLI".equalsIgnoreCase(def.getPortStrategy()) && !"ENV".equalsIgnoreCase(def.getPortStrategy())) {
+      return null;
+    }
     if (!isJava && def.getCustomPort() != null) {
       return def.getCustomPort();
     }

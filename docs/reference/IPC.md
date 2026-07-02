@@ -31,6 +31,7 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `startAll` | `startAll` | Inicia todos |
 | `stopAll` | `stopAll` | Para todos |
 | `removeService` | `removeService` | Remove serviço do workspace |
+| `removeServices` | `removeServices` | Remove vários serviços do workspace |
 | `reorderServices` | `reorderServices` | Ordem manual na tabela |
 | `reorderContainers` | `reorderContainers` | Ordem das abas de container |
 | `subscribeLogs` | `subscribeLogs` | Assina stream de log |
@@ -40,16 +41,20 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `deleteContainer` | `deleteContainer` | Remove container (serviços permanecem) |
 | `listContainers` | `listContainers` | Lista containers |
 | `addServiceToContainer` | `addServiceToContainer` | Vincula serviço |
+| `addServicesToContainer` | `addServicesToContainer` | Vincula vários serviços |
 | `removeServiceFromContainer` | `removeServiceFromContainer` | Desvincula serviço |
+| `removeServicesFromContainer` | `removeServicesFromContainer` | Desvincula vários serviços |
 | `getServicesByContainer` | — | Serviços de um container |
 | `startContainer` | `startContainer` | Inicia todos do container |
 | `stopContainer` | `stopContainer` | Para todos do container |
+| `restartContainer` | `restartContainer` | Reinicia todos do container |
 | `openServiceFolder` | `openServiceFolder` | Abre pasta no SO |
 | `openServiceTerminal` | `openServiceTerminal` | Abre terminal na pasta |
 | `openServiceInEditor` | `openServiceInEditor` | Abre no editor padrão |
 | `listJdks` | `listJdks` | JDKs detectados na máquina |
 | `getActiveJavaInfo` | `getActiveJavaInfo` | Java usado pelo core |
-| `setServiceScript` | `setServiceScript` | Script npm do serviço JS |
+| `setServiceScript` | `setServiceScript` | Script npm/PHP detectado |
+| `setServicePhpCommand` | `setServicePhpCommand` | Comando PHP manual |
 | `setServicePort` | `setServicePort` | Porta customizada |
 | `resetServicePort` | `resetServicePort` | Volta porta detectada |
 | `setServiceJavaVersion` | `setServiceJavaVersion` | JDK por serviço Spring |

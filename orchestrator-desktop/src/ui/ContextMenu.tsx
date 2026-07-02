@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
+import { ServiceBulkActions, ServiceBulkRemoveAction } from "./ServiceBulkActions";
 import { formatScriptLabel, getScriptMenuLabel, isPhpProject } from "./serviceMeta";
 import { Icon } from "./Icons";
 import { canChangeServicePort } from "./serviceMeta";
@@ -22,9 +23,16 @@ export function ContextMenu(props: {
   onRemove: (s: string, c: string) => void;
   onClose: () => void;
   onDelete: () => void;
+  bulkSelected: boolean;
+  bulkCount: number;
+  onBulkToggle: () => void;
+  onBulkRemove: () => void;
+  onBulkAddToContainer: (containerId: string) => Promise<void>;
+  onBulkRemoveFromContainer: (containerId: string) => Promise<void>;
   onSetJava: (name: string, ver: string | null) => Promise<void>;
   onSetPhp: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
+  onSetPhpCommand: (service: ServiceDto) => void;
   onSetPort: (name: string, currentPort?: string) => void;
   onSetMvnWrapper: (name: string, enabled: boolean) => Promise<void>;
 }) {
@@ -163,6 +171,16 @@ export function ContextMenu(props: {
               </SubMenu>
             </>
           )}
+          {isPhp && (
+            <MenuItem
+              icon="Terminal"
+              label="Comando PHP manual"
+              onClick={() => {
+                props.onSetPhpCommand(s);
+                props.onClose();
+              }}
+            />
+          )}
           {isConfigurable && canChangePort && (
             <MenuItem
               icon="Globe"
@@ -206,9 +224,42 @@ export function ContextMenu(props: {
               </SubMenu>
             </>
           )}
+          {props.bulkCount > 1 && props.containers.length > 0 && (
+            <>
+              <div className="divider my-1" />
+              <SubMenu label="Mover selecionados" icon="Box" isOpen={openSub === "bulk-add"}
+                menuRef={menuRef} onEnter={() => cancelClose("bulk-add")} onLeave={scheduleClose}>
+                {props.containers.map((c) => (
+                  <button key={c.id} className="flex w-full items-center rounded px-2 py-1.5 text-xs text-slate-400 transition-colors hover:bg-surface-3 hover:text-slate-200"
+                    onClick={() => { void props.onBulkAddToContainer(c.id); props.onClose(); }}>
+                    <span className="truncate">{c.name}</span>
+                  </button>
+                ))}
+              </SubMenu>
+              <SubMenu label="Remover selecionados de" icon="Box" isOpen={openSub === "bulk-remove-container"}
+                menuRef={menuRef} onEnter={() => cancelClose("bulk-remove-container")} onLeave={scheduleClose}>
+                {props.containers.map((c) => (
+                  <button key={c.id} className="flex w-full items-center rounded px-2 py-1.5 text-xs text-slate-400 transition-colors hover:bg-surface-3 hover:text-slate-200"
+                    onClick={() => { void props.onBulkRemoveFromContainer(c.id); props.onClose(); }}>
+                    <span className="truncate">{c.name}</span>
+                  </button>
+                ))}
+              </SubMenu>
+            </>
+          )}
 
           <div className="divider my-1" />
+          <ServiceBulkActions
+            selected={props.bulkSelected}
+            onToggle={props.onBulkToggle}
+            onClose={props.onClose}
+          />
           <MenuItem icon="Trash" label="Remover serviço" cls="text-danger/70 hover:text-danger hover:bg-danger/10" onClick={props.onDelete} />
+          <ServiceBulkRemoveAction
+            count={props.bulkCount}
+            onRemoveMany={props.onBulkRemove}
+            onClose={props.onClose}
+          />
         </div>
       </div>
     </>

@@ -1,5 +1,10 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.js;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.model.ProjectType;
+import dev.safra.orchestrator.model.ServiceDefinition;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,12 +14,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
 
 public class JsProjectScanner {
   private static final Set<String> SKIP_DIRS = Set.of(
@@ -44,6 +43,9 @@ public class JsProjectScanner {
           if (SKIP_DIRS.contains(name) || excluded.contains(name)) {
             return FileVisitResult.SKIP_SUBTREE;
           }
+          if (hasPhpManifest(dir)) {
+            return FileVisitResult.SKIP_SUBTREE;
+          }
           for (Path p : foundProjectDirs) {
             if (dir.startsWith(p)) {
               return FileVisitResult.SKIP_SUBTREE;
@@ -64,7 +66,7 @@ public class JsProjectScanner {
           if (Files.exists(dir.resolve("pom.xml"))) {
             return FileVisitResult.CONTINUE;
           }
-          if (PhpProjectScanner.isPhpOwnedDirectory(dir)) {
+          if (hasPhpManifest(dir)) {
             return FileVisitResult.CONTINUE;
           }
 
@@ -80,6 +82,10 @@ public class JsProjectScanner {
       e.printStackTrace();
     }
     return out;
+  }
+
+  private boolean hasPhpManifest(Path dir) {
+    return Files.isRegularFile(dir.resolve("composer.json"));
   }
 
   public void refreshServiceDefinition(ServiceDefinition def) {

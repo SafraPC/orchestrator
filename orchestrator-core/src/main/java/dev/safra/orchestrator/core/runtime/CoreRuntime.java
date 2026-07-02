@@ -1,5 +1,24 @@
 package dev.safra.orchestrator.core.runtime;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.safra.orchestrator.core.ipc.IpcEventEmitter;
+import dev.safra.orchestrator.core.ipc.IpcParams;
+import dev.safra.orchestrator.core.runtime.container.ContainerManager;
+import dev.safra.orchestrator.core.runtime.discovery.java.PortExtractor;
+import dev.safra.orchestrator.core.runtime.logs.LogFileWriter;
+import dev.safra.orchestrator.core.runtime.logs.LogManager;
+import dev.safra.orchestrator.core.runtime.service.GitBranchResolver;
+import dev.safra.orchestrator.core.runtime.service.ServiceConfigurator;
+import dev.safra.orchestrator.core.runtime.service.ServiceManager;
+import dev.safra.orchestrator.core.runtime.tools.ExternalToolLauncher;
+import dev.safra.orchestrator.core.runtime.workspace.StateStore;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceManager;
+import dev.safra.orchestrator.model.ServiceDescriptor;
+import dev.safra.orchestrator.process.JavaVersionDetector;
+import dev.safra.orchestrator.process.PhpVersionDetector;
+import dev.safra.orchestrator.process.PortProcessKiller;
+import dev.safra.orchestrator.process.ProcessManager;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -7,17 +26,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import dev.safra.orchestrator.core.ipc.IpcEventEmitter;
-import dev.safra.orchestrator.core.ipc.IpcParams;
-import dev.safra.orchestrator.model.ServiceDescriptor;
-import dev.safra.orchestrator.process.JavaVersionDetector;
-import dev.safra.orchestrator.process.PhpVersionDetector;
-import dev.safra.orchestrator.process.PortProcessKiller;
-import dev.safra.orchestrator.process.ProcessManager;
 
 public class CoreRuntime {
   private final ObjectMapper om;
@@ -83,6 +91,7 @@ public class CoreRuntime {
       case "startAll" -> serviceManager.startAll();
       case "stopAll" -> serviceManager.stopAll();
       case "removeService" -> serviceManager.remove(IpcParams.reqName(params));
+      case "removeServices" -> serviceManager.removeMany(IpcParams.stringList(params, "names"));
       case "reorderServices" -> workspaceManager.reorderServices(IpcParams.stringList(params, "order"));
       case "reorderContainers" -> workspaceManager.reorderContainers(IpcParams.stringList(params, "order"));
       case "subscribeLogs" -> {
@@ -110,14 +119,25 @@ public class CoreRuntime {
         emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
         yield serviceManager.list();
       }
+      case "addServicesToContainer" -> {
+        containerManager.addServices(IpcParams.stringList(params, "names"), IpcParams.text(params, "containerId"));
+        emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
+        yield serviceManager.list();
+      }
       case "removeServiceFromContainer" -> {
         containerManager.removeService(IpcParams.reqName(params), IpcParams.text(params, "containerId"));
+        emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
+        yield serviceManager.list();
+      }
+      case "removeServicesFromContainer" -> {
+        containerManager.removeServices(IpcParams.stringList(params, "names"), IpcParams.text(params, "containerId"));
         emitEvent.accept("workspace", om.valueToTree(workspaceManager.getWorkspace()));
         yield serviceManager.list();
       }
       case "getServicesByContainer" -> serviceManager.getByContainer(IpcParams.text(params, "containerId"));
       case "startContainer" -> serviceManager.startByContainer(IpcParams.text(params, "containerId"));
       case "stopContainer" -> serviceManager.stopByContainer(IpcParams.text(params, "containerId"));
+      case "restartContainer" -> serviceManager.restartByContainer(IpcParams.text(params, "containerId"));
       case "openServiceFolder" -> openServicePath(IpcParams.reqName(params), "Pasta aberta", launcher::openFolder);
       case "openServiceTerminal" -> openServicePath(IpcParams.reqName(params), "Terminal aberto", launcher::openTerminal);
       case "openServiceInEditor" -> openServicePath(IpcParams.reqName(params), "Editor aberto", launcher::openEditor);
@@ -135,6 +155,8 @@ public class CoreRuntime {
       }
       case "setServiceScript" -> serviceConfigurator.setServiceScript(
           IpcParams.reqName(params), IpcParams.text(params, "script"));
+      case "setServicePhpCommand" -> serviceConfigurator.setServicePhpCommand(
+          IpcParams.reqName(params), IpcParams.text(params, "command"));
       case "setServicePort" -> serviceConfigurator.setServicePort(IpcParams.reqName(params), IpcParams.reqPort(params));
       case "resetServicePort" -> serviceConfigurator.resetServicePort(IpcParams.reqName(params));
       case "setServiceJavaVersion" -> serviceConfigurator.setServiceJavaVersion(

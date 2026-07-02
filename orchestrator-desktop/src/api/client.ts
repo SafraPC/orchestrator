@@ -52,6 +52,7 @@ export const api = {
   startAll: () => core<ServiceDto[]>("startAll"),
   stopAll: () => core<StopResultDto[]>("stopAll"),
   removeService: (name: string) => core<ServiceDto[]>("removeService", { name }),
+  removeServices: (names: string[]) => core<ServiceDto[]>("removeServices", { names }),
 
   subscribeLogs: (name: string, tail = 200) => core<{ subId: string }>("subscribeLogs", { name, tail }),
   unsubscribeLogs: (subId: string) => core<{ ok: boolean }>("unsubscribeLogs", { subId }),
@@ -65,9 +66,12 @@ export const api = {
   deleteContainer: (id: string) => core<ContainerDto>("deleteContainer", { id }),
   listContainers: () => core<ContainerDto[]>("listContainers"),
   addServiceToContainer: (serviceName: string, containerId: string) => core<ServiceDto[]>("addServiceToContainer", { name: serviceName, containerId }),
+  addServicesToContainer: (names: string[], containerId: string) => core<ServiceDto[]>("addServicesToContainer", { names, containerId }),
   removeServiceFromContainer: (serviceName: string, containerId: string) => core<ServiceDto[]>("removeServiceFromContainer", { name: serviceName, containerId }),
+  removeServicesFromContainer: (names: string[], containerId: string) => core<ServiceDto[]>("removeServicesFromContainer", { names, containerId }),
   startContainer: (containerId: string) => core<ServiceDto[]>("startContainer", { containerId }),
   stopContainer: (containerId: string) => core<StopResultDto[]>("stopContainer", { containerId }),
+  restartContainer: (containerId: string) => core<ServiceDto[]>("restartContainer", { containerId }),
 
   openServiceFolder: (name: string) => core<{ ok: boolean; message: string }>("openServiceFolder", { name }),
   openServiceTerminal: (name: string) => core<{ ok: boolean; message: string }>("openServiceTerminal", { name }),
@@ -79,6 +83,7 @@ export const api = {
   setServiceJavaVersion: (name: string, javaVersion: string | null) => core<ServiceDto[]>("setServiceJavaVersion", { name, javaVersion }),
   setServicePhpVersion: (name: string, phpVersion: string | null) => core<ServiceDto[]>("setServicePhpVersion", { name, phpVersion }),
   setServiceScript: (name: string, script: string) => core<ServiceDto[]>("setServiceScript", { name, script }),
+  setServicePhpCommand: (name: string, command: string) => core<ServiceDto[]>("setServicePhpCommand", { name, command }),
   setServiceMvnWrapper: (name: string, enabled: boolean) => core<ServiceDto[]>("setServiceMvnWrapper", { name, enabled }),
   rebuildServices: () => core<ServiceDto[]>("rebuildServices"),
   setServicePort: (name: string, port: number) => core<ServiceDto[]>("setServicePort", { name, port }),

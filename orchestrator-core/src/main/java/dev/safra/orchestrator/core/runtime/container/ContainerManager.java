@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.container;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -93,19 +93,21 @@ public class ContainerManager {
       throw new IllegalArgumentException("params.containerId é obrigatório");
 
     Workspace w = ws();
-    if (!w.getContainers().containsKey(containerId))
-      throw new IllegalArgumentException("Container não encontrado: " + containerId);
+    requireContainer(w, containerId);
+    addServiceToContainer(w, serviceName, containerId);
+    persistWorkspace.run();
+  }
 
-    ServiceDefinition def = w.getServices().stream()
-        .filter(s -> s.getName().equals(serviceName))
-        .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("Serviço não encontrado: " + serviceName));
+  public void addServices(List<String> serviceNames, String containerId) {
+    if (serviceNames == null || serviceNames.isEmpty())
+      throw new IllegalArgumentException("params.names é obrigatório");
+    if (containerId == null || containerId.isBlank())
+      throw new IllegalArgumentException("params.containerId é obrigatório");
 
-    if (def.getContainerIds() == null) {
-      def.setContainerIds(new ArrayList<>());
-    }
-    if (!def.getContainerIds().contains(containerId)) {
-      def.getContainerIds().add(containerId);
+    Workspace w = ws();
+    requireContainer(w, containerId);
+    for (String serviceName : serviceNames) {
+      addServiceToContainer(w, serviceName, containerId);
     }
     persistWorkspace.run();
   }
@@ -123,5 +125,44 @@ public class ContainerManager {
       def.getContainerIds().remove(containerId);
     }
     persistWorkspace.run();
+  }
+
+  public void removeServices(List<String> serviceNames, String containerId) {
+    if (serviceNames == null || serviceNames.isEmpty())
+      throw new IllegalArgumentException("params.names é obrigatório");
+    if (containerId == null || containerId.isBlank())
+      throw new IllegalArgumentException("params.containerId é obrigatório");
+
+    Workspace w = ws();
+    for (String serviceName : serviceNames) {
+      ServiceDefinition def = requireService(w, serviceName);
+      if (def.getContainerIds() != null) {
+        def.getContainerIds().remove(containerId);
+      }
+    }
+    persistWorkspace.run();
+  }
+
+  private void requireContainer(Workspace w, String containerId) {
+    if (!w.getContainers().containsKey(containerId))
+      throw new IllegalArgumentException("Container não encontrado: " + containerId);
+  }
+
+  private void addServiceToContainer(Workspace w, String serviceName, String containerId) {
+    ServiceDefinition def = requireService(w, serviceName);
+
+    if (def.getContainerIds() == null) {
+      def.setContainerIds(new ArrayList<>());
+    }
+    if (!def.getContainerIds().contains(containerId)) {
+      def.getContainerIds().add(containerId);
+    }
+  }
+
+  private ServiceDefinition requireService(Workspace w, String serviceName) {
+    return w.getServices().stream()
+        .filter(s -> s.getName().equals(serviceName))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Serviço não encontrado: " + serviceName));
   }
 }

@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.php;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -37,6 +37,9 @@ public class StandalonePhpScanner {
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
           String name = dir.getFileName() == null ? "" : dir.getFileName().toString();
           if (SKIP_DIRS.contains(name) || excluded.contains(name)) {
+            return FileVisitResult.SKIP_SUBTREE;
+          }
+          if (hasManifest(dir)) {
             return FileVisitResult.SKIP_SUBTREE;
           }
           return FileVisitResult.CONTINUE;

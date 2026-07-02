@@ -20,7 +20,7 @@ export function ContainersPanel(props: {
   const [newName, setNewName] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContainerDto | null>(null);
-  const [busyContainers, setBusyContainers] = useState<Record<string, "starting" | "stopping">>({});
+  const [busyContainers, setBusyContainers] = useState<Record<string, "starting" | "stopping" | "restarting">>({});
 
   const handleReorder = useCallback((reordered: ContainerDto[]) => {
     props.onContainersReorder?.(reordered);
@@ -70,6 +70,15 @@ export function ContainersPanel(props: {
     props.onToast?.("info", `Parando "${c.name}"...`);
     api.stopContainer(c.id)
       .then(() => { props.onToast?.("success", `"${c.name}" parado`); return props.onRefresh(); })
+      .catch((e) => props.onToast?.("error", String(e)))
+      .finally(() => setBusyContainers((prev) => { const n = { ...prev }; delete n[c.id]; return n; }));
+  }
+
+  function handleRestartContainer(c: ContainerDto) {
+    setBusyContainers((prev) => ({ ...prev, [c.id]: "restarting" }));
+    props.onToast?.("info", `Reiniciando "${c.name}"...`);
+    api.restartContainer(c.id)
+      .then(() => { props.onToast?.("success", `"${c.name}" reiniciado`); return props.onRefresh(); })
       .catch((e) => props.onToast?.("error", String(e)))
       .finally(() => setBusyContainers((prev) => { const n = { ...prev }; delete n[c.id]; return n; }));
   }
@@ -138,7 +147,7 @@ export function ContainersPanel(props: {
                     {busy ? <Spinner /> : <Icon.Box className={`h-3 w-3 ${sel ? "text-accent" : "text-slate-600"}`} />}
                   </div>
                   <span className={`truncate text-xs font-medium flex-1 min-w-0 ${sel ? "text-slate-100" : "text-slate-300"}`}>{c.name}</span>
-                  {busy && <span className={`badge shrink-0 text-2xs ${busy === "starting" ? "bg-accent/10 text-accent" : "bg-danger/10 text-danger"}`}>{busy === "starting" ? "Iniciando..." : "Parando..."}</span>}
+                  {busy && <span className={`badge shrink-0 text-2xs ${busy === "stopping" ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>{busy === "starting" ? "Iniciando..." : busy === "stopping" ? "Parando..." : "Reiniciando..."}</span>}
                   {!busy && running > 0 && <span className="badge bg-accent/10 text-accent shrink-0">{running}/{total}</span>}
                   {!busy && running === 0 && total > 0 && <span className="badge bg-surface-3 text-slate-500 shrink-0">{total}</span>}
                   <div className="ml-auto flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -153,6 +162,13 @@ export function ContainersPanel(props: {
                       <Tooltip text="Parar todos">
                         <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-danger hover:bg-danger/10" disabled={!!busy} onClick={() => handleStopContainer(c)}>
                           <Icon.Stop className="h-3 w-3" />
+                        </button>
+                      </Tooltip>
+                    )}
+                    {total > 0 && (
+                      <Tooltip text="Reiniciar todos">
+                        <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-accent" disabled={!!busy} onClick={() => handleRestartContainer(c)}>
+                          <Icon.Restart className="h-3 w-3" />
                         </button>
                       </Tooltip>
                     )}

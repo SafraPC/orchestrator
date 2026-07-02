@@ -26,6 +26,7 @@ import { useWorkspaceData } from "./useWorkspaceData";
 
 export function App(props: { onReady?: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedContainer, setSelectedContainer] = useState<string | null>(null);
   const [containersCollapsed, setContainersCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,6 +47,7 @@ export function App(props: { onReady?: () => void }) {
     onReady: props.onReady,
     onServicesLoaded: (list) => {
       setSelected((prev) => (prev && !list.some((s) => s.name === prev) ? null : prev));
+      setSelectedServices((prev) => prev.filter((name) => list.some((s) => s.name === name)));
     },
   });
 
@@ -78,6 +80,10 @@ export function App(props: { onReady?: () => void }) {
   const selectedService = useMemo(
     () => services.find((s) => s.name === selected) ?? null,
     [services, selected],
+  );
+  const selectedLogServices = useMemo(
+    () => selectedServices.map((name) => services.find((s) => s.name === name)).filter((s): s is ServiceDto => !!s),
+    [selectedServices, services],
   );
 
   useServiceBranchPolling(services, setServices);
@@ -234,6 +240,8 @@ export function App(props: { onReady?: () => void }) {
               allServices={services}
               selected={selected}
               onSelect={setSelected}
+              selectedServices={selectedServices}
+              onSelectedServicesChange={setSelectedServices}
               onAction={refresh}
               onServicesUpdate={handleServicesReorder}
               selectedContainer={selectedContainer}
@@ -256,6 +264,7 @@ export function App(props: { onReady?: () => void }) {
         <section className="flex flex-1 min-w-0 flex-col relative">
           <LogsPanel
             service={selectedService}
+            selectedServices={selectedLogServices}
             selectedContainer={selectedContainer}
             containerServices={containerServices}
             fontSize={settings.fontSize}

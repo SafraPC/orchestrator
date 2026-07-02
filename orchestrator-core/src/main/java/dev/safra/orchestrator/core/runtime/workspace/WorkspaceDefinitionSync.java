@@ -1,5 +1,12 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.workspace;
 
+import dev.safra.orchestrator.core.runtime.discovery.java.PortExtractor;
+import dev.safra.orchestrator.core.runtime.discovery.js.JsLaunchCommands;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpProjectScanner;
+import dev.safra.orchestrator.core.runtime.service.MavenWrapperDetector;
+import dev.safra.orchestrator.model.ProjectType;
+import dev.safra.orchestrator.model.ServiceDefinition;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -8,9 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
 
 public final class WorkspaceDefinitionSync {
   private static final Set<String> NON_RUNTIME_JS_SCRIPTS = Set.of(
@@ -138,7 +142,8 @@ public final class WorkspaceDefinitionSync {
       return null;
     }
     if (preferred != null && !preferred.isBlank() && available.contains(preferred)
-        && PhpProjectScanner.isRuntimeComposerScriptName(preferred)) {
+        && (PhpProjectScanner.isRuntimeComposerScriptName(preferred)
+            || PhpLaunchCommands.isCustomCommandScript(preferred))) {
       return preferred;
     }
     if (available.contains(PhpLaunchCommands.ARTISAN_SERVE)) {

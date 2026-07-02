@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.logs;
 
 import java.io.FileWriter;
 import java.io.IOException;

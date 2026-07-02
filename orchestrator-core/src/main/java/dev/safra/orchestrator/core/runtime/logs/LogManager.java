@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.logs;
 
 import java.nio.file.Path;
 import java.util.Map;

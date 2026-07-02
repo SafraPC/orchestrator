@@ -1,10 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import { api } from "../api/client";
 import type { ContainerDto, JdkInfo, PhpInfo, ServiceDto } from "../api/types";
 import { Icon } from "./Icons";
-import { Modal } from "./Modal";
-import { ServicePortModal } from "./ServicePortModal";
 import { ServiceRow } from "./ServiceRow";
+import { ServiceTableDialogs } from "./ServiceTableDialogs";
 import { getServicePort } from "./serviceMeta";
 import type { ToastType } from "./Toast";
 import { mergeSubsetOrderIds } from "./mergeSubsetOrder";
@@ -15,6 +15,8 @@ export function ServiceTable(props: {
   allServices?: ServiceDto[];
   selected: string | null;
   onSelect: (name: string) => void;
+  selectedServices: string[];
+  onSelectedServicesChange: (names: string[]) => void;
   onAction: () => Promise<void>;
   onServicesUpdate?: (s: ServiceDto[]) => void;
   selectedContainer?: string | null;
@@ -30,6 +32,9 @@ export function ServiceTable(props: {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [rmContTarget, setRmContTarget] = useState<{ svc: string; cid: string; cname: string } | null>(null);
   const [portTarget, setPortTarget] = useState<{ name: string; currentPort?: string; detectedPort?: string | null; hasCustomPort: boolean } | null>(null);
+  const [phpCommandTarget, setPhpCommandTarget] = useState<ServiceDto | null>(null);
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
 
   const allSvcs = props.allServices ?? props.services;
   const handleReorder = useCallback(
@@ -42,6 +47,12 @@ export function ServiceTable(props: {
   );
 
   const { items: orderedServices, containerRef, gripProps, activeId } = useDragReorder(props.services, (service) => service.name, handleReorder);
+  const selectedSet = useMemo(() => new Set(props.selectedServices), [props.selectedServices]);
+  const orderedNames = useMemo(() => orderedServices.map((service) => service.name), [orderedServices]);
+  const selectedBulkNames = useMemo(
+    () => allSvcs.filter((service) => selectedSet.has(service.name)).map((service) => service.name),
+    [allSvcs, selectedSet],
+  );
 
   async function addTo(serviceName: string, containerId: string) {
     setMenuOpen(null);
@@ -54,29 +65,71 @@ export function ServiceTable(props: {
     }
   }
 
-  async function confirmRemoveService() {
-    if (!deleteTarget) return;
-    const name = deleteTarget;
-    setDeleteTarget(null);
+  async function addSelectedToContainer(containerId: string) {
     try {
-      await api.removeService(name);
+      const updated = await api.addServicesToContainer(selectedBulkNames, containerId);
+      props.onServicesUpdate?.(updated);
       await props.onAction();
-      props.onToast?.("success", `"${name}" removido`);
+      props.onToast?.("success", `${selectedBulkNames.length} serviço(s) movido(s)`);
     } catch (error) {
       props.onToast?.("error", String(error));
     }
   }
 
-  async function confirmRmCont() {
-    if (!rmContTarget) return;
+  async function removeSelectedFromContainer(containerId: string) {
     try {
-      const updated = await api.removeServiceFromContainer(rmContTarget.svc, rmContTarget.cid);
+      const updated = await api.removeServicesFromContainer(selectedBulkNames, containerId);
       props.onServicesUpdate?.(updated);
       await props.onAction();
+      props.onToast?.("success", `${selectedBulkNames.length} serviço(s) removido(s) do container`);
     } catch (error) {
       props.onToast?.("error", String(error));
     }
-    setRmContTarget(null);
+  }
+
+  async function removeSelectedServices() {
+    try {
+      const updated = await api.removeServices(selectedBulkNames);
+      props.onSelectedServicesChange([]);
+      props.onServicesUpdate?.(updated);
+      await props.onAction();
+      props.onToast?.("success", `${selectedBulkNames.length} serviço(s) removido(s)`);
+    } catch (error) {
+      props.onToast?.("error", String(error));
+    }
+  }
+
+  function toggleBulkSelection(name: string) {
+    const next = new Set(props.selectedServices);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    props.onSelectedServicesChange([...next]);
+    setSelectionAnchor(name);
+  }
+
+  function selectRow(service: ServiceDto, event: MouseEvent) {
+    props.onSelect(service.name);
+    if (event.shiftKey && selectionAnchor) {
+      const anchorIndex = orderedNames.indexOf(selectionAnchor);
+      const targetIndex = orderedNames.indexOf(service.name);
+      if (anchorIndex >= 0 && targetIndex >= 0) {
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        props.onSelectedServicesChange(orderedNames.slice(start, end + 1));
+        return;
+      }
+    }
+    setSelectionAnchor(service.name);
+    props.onSelectedServicesChange([service.name]);
+  }
+
+  function openServiceMenu(service: ServiceDto, preserveSelection: boolean) {
+    props.onSelect(service.name);
+    if (!preserveSelection || !selectedSet.has(service.name)) {
+      props.onSelectedServicesChange([service.name]);
+      setSelectionAnchor(service.name);
+    }
+    setMenuOpen(menuOpen === service.name ? null : service.name);
   }
 
   async function resetPort(name: string) {
@@ -122,9 +175,16 @@ export function ServiceTable(props: {
           phps={props.phps ?? []}
           menuOpen={menuOpen === service.name}
           isDragging={activeId === service.name}
+          bulkSelected={selectedSet.has(service.name)}
+          bulkCount={selectedBulkNames.length}
           gripProps={gripProps(service.name)}
-          onSelect={() => props.onSelect(service.name)}
-          onMenuToggle={() => setMenuOpen(menuOpen === service.name ? null : service.name)}
+          onSelect={(event) => selectRow(service, event)}
+          onBulkToggle={() => toggleBulkSelection(service.name)}
+          onBulkRemove={() => setBulkRemoveOpen(true)}
+          onBulkAddToContainer={addSelectedToContainer}
+          onBulkRemoveFromContainer={removeSelectedFromContainer}
+          onMenuToggle={() => openServiceMenu(service, true)}
+          onContextMenuOpen={() => openServiceMenu(service, true)}
           onMenuClose={() => setMenuOpen(null)}
           onDelete={() => {
             setMenuOpen(null);
@@ -165,6 +225,10 @@ export function ServiceTable(props: {
             } catch (error) {
               props.onToast?.("error", String(error));
             }
+          }}
+          onSetPhpCommand={(target) => {
+            setMenuOpen(null);
+            setPhpCommandTarget(target);
           }}
           onSetPort={(target) => {
             setMenuOpen(null);
@@ -222,43 +286,23 @@ export function ServiceTable(props: {
           <p className="text-2xs text-slate-700 mt-1">Importe um projeto para começar</p>
         </div>
       )}
-      <Modal
-        open={!!deleteTarget}
-        title="Remover serviço"
-        message={`Remover "${deleteTarget}"?\nIsso não deleta o projeto.`}
-        kind="danger"
-        confirmLabel="Remover"
-        onConfirm={() => void confirmRemoveService()}
-        onCancel={() => setDeleteTarget(null)}
-      />
-      <Modal
-        open={!!rmContTarget}
-        title="Remover do container"
-        message={`Remover serviço de "${rmContTarget?.cname}"?`}
-        kind="warning"
-        confirmLabel="Remover"
-        onConfirm={() => void confirmRmCont()}
-        onCancel={() => setRmContTarget(null)}
-      />
-      <ServicePortModal
-        open={!!portTarget}
-        serviceName={portTarget?.name ?? null}
-        currentPort={portTarget?.currentPort}
-        detectedPort={portTarget?.detectedPort}
-        hasCustomPort={portTarget?.hasCustomPort}
+      <ServiceTableDialogs
+        deleteTarget={deleteTarget}
+        rmContTarget={rmContTarget}
+        portTarget={portTarget}
+        phpCommandTarget={phpCommandTarget}
         allServices={allSvcs}
-        onCancel={() => setPortTarget(null)}
-        onConfirm={async (name, port) => {
-          try {
-            const updated = await api.setServicePort(name, port);
-            props.onServicesUpdate?.(updated);
-            props.onToast?.("success", `Porta ${port} → ${name}`);
-          } catch (error) {
-            props.onToast?.("error", String(error));
-          } finally {
-            setPortTarget(null);
-          }
-        }}
+        bulkRemoveOpen={bulkRemoveOpen}
+        bulkRemoveCount={selectedBulkNames.length}
+        onDeleteTarget={setDeleteTarget}
+        onRmContTarget={setRmContTarget}
+        onPortTarget={setPortTarget}
+        onPhpCommandTarget={setPhpCommandTarget}
+        onBulkRemoveOpen={setBulkRemoveOpen}
+        onBulkRemove={() => void removeSelectedServices()}
+        onServicesUpdate={props.onServicesUpdate}
+        onAction={props.onAction}
+        onToast={props.onToast}
       />
     </div>
   );

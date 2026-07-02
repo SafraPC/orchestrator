@@ -1,16 +1,20 @@
-package dev.safra.orchestrator.core.runtime;
-
-import java.util.function.BiConsumer;
+package dev.safra.orchestrator.core.runtime.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import dev.safra.orchestrator.core.runtime.discovery.js.JsLaunchCommands;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceDefinitionSync;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceManager;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.model.ServiceStatus;
 import dev.safra.orchestrator.process.PortProcessKiller;
 import dev.safra.orchestrator.process.ProcessManager;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiConsumer;
 
 public class ServiceConfigurator {
   private final ObjectMapper om;
@@ -32,12 +36,11 @@ public class ServiceConfigurator {
     ServiceDescriptor sd = serviceManager.requireService(name);
     ServiceDefinition def = sd.getDefinition();
     return finishConfigChange(sd, () -> {
-      if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-        if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
-          PhpLaunchCommands.applySelection(def, script);
-        } else {
-          JsLaunchCommands.applySelection(def, script);
-        }
+      if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+        ensurePhpScriptAvailable(def, script);
+        PhpLaunchCommands.applySelection(def, script);
+      } else if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
+        JsLaunchCommands.applySelection(def, script);
       }
       if (JsLaunchCommands.usesNpmRun(def.getProjectType())) {
         workspaceManager.refreshDynamicJsMetadata(def);
@@ -45,6 +48,10 @@ public class ServiceConfigurator {
         workspaceManager.refreshDynamicPhpMetadata(def);
       }
     }, false);
+  }
+
+  public JsonNode setServicePhpCommand(String name, String command) {
+    return setServiceScript(name, PhpLaunchCommands.customCommandScript(command));
   }
 
   public JsonNode setServicePort(String name, int port) {
@@ -110,6 +117,17 @@ public class ServiceConfigurator {
         sd.getDefinition().setJavaHome(resolved);
       }
     }, true);
+  }
+
+  private void ensurePhpScriptAvailable(ServiceDefinition def, String script) {
+    if (!PhpLaunchCommands.isCustomCommandScript(script)) {
+      return;
+    }
+    List<String> scripts = def.getAvailableScripts() == null ? new ArrayList<>() : new ArrayList<>(def.getAvailableScripts());
+    if (!scripts.contains(script)) {
+      scripts.add(script);
+      def.setAvailableScripts(scripts);
+    }
   }
 
   public JsonNode setServiceMvnWrapper(String name, boolean enabled) {

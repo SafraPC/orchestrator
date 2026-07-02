@@ -9,7 +9,15 @@
 | --- | --- |
 | `core` | Main, Args, Json |
 | `core.ipc` | IpcRequest/Response/Event, IpcParams, IpcEventEmitter |
-| `core.runtime` | Application services: managers, scanners, configurators |
+| `core.runtime` | CoreRuntime IPC/lifecycle coordinator |
+| `core.runtime.workspace` | Workspace state, roots, scan orchestration, persistence |
+| `core.runtime.service` | Service lifecycle/configuration, branch read model, ServiceView mapping |
+| `core.runtime.container` | Logical container CRUD and service links |
+| `core.runtime.logs` | Log files, subscriptions, core log events |
+| `core.runtime.discovery.java` | Spring Boot/Maven scanning and Java port extraction |
+| `core.runtime.discovery.js` | Node/JS/HTML scanning, framework detection, JS launch commands |
+| `core.runtime.discovery.php` | PHP/Composer scanning, PHP launch commands, standalone PHP |
+| `core.runtime.tools` | Open folder, terminal, editor |
 | `model` | Domain: Workspace (aggregate), ServiceDefinition, ServiceView (read model), Container |
 | `process` | OS/process infrastructure |
 
@@ -34,4 +42,4 @@ mvn clean package -DskipTests # standalone JAR → copy to desktop src-tauri/
 ```
 
 ## Key classes
-WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore
+CoreRuntime, WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore

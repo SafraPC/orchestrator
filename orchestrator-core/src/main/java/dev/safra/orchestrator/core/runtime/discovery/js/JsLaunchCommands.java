@@ -1,10 +1,11 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.js;
 
-import java.nio.file.Path;
-import java.util.List;
-
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceDefinitionSync;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
+import java.nio.file.Path;
+import java.util.List;
 
 public final class JsLaunchCommands {
   private static final int DEFAULT_STATIC_PORT = 3000;

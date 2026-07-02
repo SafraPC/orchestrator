@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.logs;
 
 import java.io.RandomAccessFile;
 import java.nio.charset.Charset;

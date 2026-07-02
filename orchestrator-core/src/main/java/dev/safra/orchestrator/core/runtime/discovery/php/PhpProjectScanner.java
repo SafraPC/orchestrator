@@ -1,5 +1,11 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.php;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.safra.orchestrator.core.runtime.discovery.js.DevServerPortDetector;
+import dev.safra.orchestrator.core.runtime.workspace.WorkspaceDefinitionSync;
+import dev.safra.orchestrator.model.ProjectType;
+import dev.safra.orchestrator.model.ServiceDefinition;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,12 +16,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
 
 public class PhpProjectScanner {
   private static final Set<String> SKIP_DIRS = Set.of(
@@ -166,9 +166,13 @@ public class PhpProjectScanner {
     if (scripts.isEmpty()) {
       return null;
     }
+    if (PhpLaunchCommands.isCustomCommandScript(preferredScript) && !scripts.contains(preferredScript)) {
+      scripts.add(preferredScript);
+    }
     String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(preferredScript, scripts);
-    int port = extractPort(dir, root, selected, type);
-    return new PhpMetadata(type, scripts, selected, port, PhpLaunchCommands.defaultPortStrategy(type), extractPhpVersion(root));
+    Integer port = extractPort(dir, root, selected, type);
+    String portStrategy = isComposerScript(selected) ? "UNSUPPORTED" : PhpLaunchCommands.defaultPortStrategy(type);
+    return new PhpMetadata(type, scripts, selected, port, portStrategy, extractPhpVersion(root));
   }
 
   private ProjectType detectFramework(Path dir, JsonNode root) {
@@ -292,7 +296,7 @@ public class PhpProjectScanner {
     return null;
   }
 
-  private int extractPort(Path dir, JsonNode root, String selectedScript, ProjectType type) {
+  private Integer extractPort(Path dir, JsonNode root, String selectedScript, ProjectType type) {
     if (PhpLaunchCommands.ARTISAN_SERVE.equals(selectedScript)
         || PhpLaunchCommands.SYMFONY_SERVE.equals(selectedScript)
         || PhpLaunchCommands.PHP_BUILTIN_SERVE.equals(selectedScript)) {
@@ -306,22 +310,13 @@ public class PhpProjectScanner {
       }
       return PhpLaunchCommands.defaultPort(type);
     }
-    JsonNode scripts = root.path("scripts");
-    if (scripts.isObject() && scripts.has(selectedScript)) {
-      Integer fromScript = DevServerPortDetector.parsePort(scriptBody(scripts.get(selectedScript)));
-      if (fromScript != null) {
-        return fromScript;
-      }
-    }
-    Integer envPort = readEnvPort(dir);
-    if (envPort != null) {
-      return envPort;
-    }
-    Integer frontendProxyPort = DevServerPortDetector.readSiblingFrontendProxyPort(dir);
-    if (frontendProxyPort != null) {
-      return frontendProxyPort;
-    }
-    return PhpLaunchCommands.defaultPort(type);
+    return null;
+  }
+
+  private boolean isComposerScript(String selectedScript) {
+    return selectedScript != null
+        && !PhpLaunchCommands.isInternalScript(selectedScript)
+        && !PhpLaunchCommands.isCustomCommandScript(selectedScript);
   }
 
   private Integer readEnvPort(Path dir) {
@@ -332,7 +327,7 @@ public class PhpProjectScanner {
       ProjectType projectType,
       List<String> scripts,
       String selectedScript,
-      int detectedPort,
+      Integer detectedPort,
       String portStrategy,
       String phpVersion) {
   }

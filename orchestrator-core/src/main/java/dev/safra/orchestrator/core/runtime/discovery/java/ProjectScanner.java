@@ -1,5 +1,8 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.discovery.java;
 
+import dev.safra.orchestrator.core.runtime.workspace.StateStore;
+import dev.safra.orchestrator.model.ProjectType;
+import dev.safra.orchestrator.model.ServiceDefinition;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,9 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
 
 public class ProjectScanner {
   private final StateStore store;

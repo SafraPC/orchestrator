@@ -1,13 +1,30 @@
 # orchestrator-core — runtime
 
+## Package map
+`CoreRuntime.java` fica na raiz de `core/runtime` e coordena o IPC.
+
+Subpacotes:
+- `workspace/` — estado persistido, roots, scan orchestration e merge pós-scan.
+- `service/` — ciclo de vida/configuração de serviços, branch atual e DTO `ServiceView`.
+- `container/` — CRUD e vínculos de containers lógicos.
+- `logs/` — arquivo de log, assinaturas e emissão de eventos.
+- `discovery/java/` — scanner Spring Boot/Maven e porta Java.
+- `discovery/js/` — scanner Node/JS/HTML, detecção de framework e comandos JS.
+- `discovery/php/` — scanner PHP/Composer, comandos PHP e standalone PHP.
+- `tools/` — abertura de pasta, terminal e editor externo.
+
 ## JS framework layer
-`core/runtime/JsFrameworkDetector.java` — detecção de stack JS/TS, porta padrão, `portStrategy` e scripts preferidos.
+`discovery/js/JsFrameworkDetector.java` — detecção de stack JS/TS, porta padrão, `portStrategy` e scripts preferidos.
 
 Ordem de detecção: Next → Nest → Remix → Angular → Astro → Svelte → Fastify → Hono → Express → Vue → React → UNKNOWN.
 
-`JsProjectScanner` delega detecção e usa `npm run` para todos os tipos acima.
+`JsProjectScanner` delega detecção e usa `npm run` para todos os tipos acima. Ao varrer uma raiz maior, não entra em subárvores com `composer.json`; frontends dentro de projetos PHP só aparecem quando importados diretamente.
 
 ## PHP runtime layer
-`PhpProjectScanner` detecta projetos com `composer.json` e docroot web; `PhpLaunchCommands` monta `artisan:serve`, `symfony:serve` ou `php:serve`.
+`discovery/php/PhpProjectScanner` detecta projetos com `composer.json` e docroot web; `PhpLaunchCommands` monta `artisan:serve`, `symfony:serve`, `php:serve` ou comandos manuais `custom:`.
 
 Comandos web iniciados diretamente por `php` devem manter `display_errors=0` e `log_errors=1` para não misturar warnings/deprecations no corpo JSON das APIs.
+
+Scripts Composer (`composer run <script>`) devem manter `portStrategy=UNSUPPORTED` e `detectedPort=null`: o Orchestrator só executa o comando e lê o log, sem liberar/injetar porta.
+
+`StandaloneJsScanner` e `StandalonePhpScanner` só descobrem arquivos avulsos fora de diretórios com `package.json`, `composer.json` ou `pom.xml`.

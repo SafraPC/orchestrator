@@ -34,23 +34,23 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 |-------|---------------|---------|
 | Main | Entry point, reads stdin, dispatches to CoreRuntime | core |
 | CoreRuntime | Method dispatch, lifecycle | core.runtime |
-| WorkspaceManager | Roots, scan, persistence | core.runtime |
-| WorkspaceDefinitionSync | Após scan: reaplica port/MVN no Spring; preserva java/script por serviço | core.runtime |
+| WorkspaceManager | Roots, scan, persistence | core.runtime.workspace |
+| WorkspaceDefinitionSync | Após scan: reaplica port/MVN no Spring; preserva java/script por serviço | core.runtime.workspace |
 | MavenLaunchCommands | Windows: `./mvnw` → `mvnw.cmd` absoluto | process |
-| ServiceManager | Start/stop/restart, status refresh | core.runtime |
-| ContainerManager | Container CRUD, service linking | core.runtime |
-| LogManager | Log subscriptions, emit lines | core.runtime |
-| ProjectScanner | Walk dirs, find pom.xml, detect Spring Boot | core.runtime |
-| JsProjectScanner | Walk dirs, find package.json; ignora dirs PHP (`composer.json` + artisan/symfony); Angular/React/Vue/Next/Nest | core.runtime |
-| StandaloneJsScanner | HTML sem package.json (`STATIC_HTML`); `.js` avulso (`STANDALONE_JS`) | core.runtime |
-| JsLaunchCommands | `npm run`, `npx serve`, `node file.js`; portas e `applySelection` | core.runtime |
-| PhpProjectScanner | `composer.json`; Laravel/Symfony/Composer; ignora dirs com `pom.xml` | core.runtime |
-| StandalonePhpScanner | `index.php` sem manifest (`STANDALONE_PHP`) | core.runtime |
-| PhpLaunchCommands | `artisan serve`, `composer run`, `symfony server`, `php -S` | core.runtime |
+| ServiceManager | Start/stop/restart, status refresh | core.runtime.service |
+| ContainerManager | Container CRUD, service linking | core.runtime.container |
+| LogManager | Log subscriptions, emit lines | core.runtime.logs |
+| ProjectScanner | Walk dirs, find pom.xml, detect Spring Boot | core.runtime.discovery.java |
+| JsProjectScanner | Walk dirs, find package.json; ignora subárvores PHP; Angular/React/Vue/Next/Nest | core.runtime.discovery.js |
+| StandaloneJsScanner | HTML sem package.json (`STATIC_HTML`); `.js` avulso (`STANDALONE_JS`) | core.runtime.discovery.js |
+| JsLaunchCommands | `npm run`, `npx serve`, `node file.js`; portas e `applySelection` | core.runtime.discovery.js |
+| PhpProjectScanner | `composer.json`; Laravel/Symfony/Composer; ignora dirs com `pom.xml` | core.runtime.discovery.php |
+| StandalonePhpScanner | `index.php` sem manifest (`STANDALONE_PHP`) | core.runtime.discovery.php |
+| PhpLaunchCommands | `artisan serve`, `composer run`, `symfony server`, `php -S` | core.runtime.discovery.php |
 | PhpVersionDetector | PHP no PATH, Homebrew, phpenv | process |
-| PortExtractor | Read port from application.properties/yml | core.runtime |
-| ExternalToolLauncher | Open folder/terminal/editor | core.runtime |
-| StateStore | JSON read/write to files | core.runtime |
+| PortExtractor | Read port from application.properties/yml | core.runtime.discovery.java |
+| ExternalToolLauncher | Open folder/terminal/editor | core.runtime.tools |
+| StateStore | JSON read/write to files | core.runtime.workspace |
 | ProcessManager | Process start/stop/kill, alive check | process |
 | JavaVersionDetector | JDKs: SDKMAN, Homebrew, Program Files (Windows), macOS JVMs, JAVA_HOME | process |
 

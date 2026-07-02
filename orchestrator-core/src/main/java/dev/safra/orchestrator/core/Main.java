@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.safra.orchestrator.core.ipc.IpcEvent;
 import dev.safra.orchestrator.core.ipc.IpcRequest;
 import dev.safra.orchestrator.core.ipc.IpcResponse;
-import dev.safra.orchestrator.core.runtime.LogFileWriter;
+import dev.safra.orchestrator.core.runtime.logs.LogFileWriter;
 import dev.safra.orchestrator.core.runtime.CoreRuntime;
 
 public class Main {

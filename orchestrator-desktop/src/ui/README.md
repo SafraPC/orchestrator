@@ -10,12 +10,14 @@
 | Toolbar | `Toolbar.tsx` | Ações rápidas, kill port, filtros |
 | ImportSection | `ImportSection.tsx` | Importar pastas/roots |
 | ContainerTabs | `ContainerTabs.tsx` | Abas por container |
-| ContainersPanel | `ContainersPanel.tsx` | CRUD e start/stop de container |
-| ServiceTable | `ServiceTable.tsx` | Lista de serviços |
+| ContainersPanel | `ContainersPanel.tsx` | CRUD e start/stop/restart de container |
+| ServiceTable | `ServiceTable.tsx` | Lista de serviços e seleção múltipla |
+| ServiceBulkActions | `ServiceBulkActions.tsx` | Ações de seleção múltipla no menu de serviço |
+| ServiceTableDialogs | `ServiceTableDialogs.tsx` | Modais acionados pela tabela de serviços |
 | ServiceRow | `ServiceRow.tsx` | Linha individual na tabela |
 | ContextMenu | `ContextMenu.tsx` | Menu de contexto do serviço |
 | LogsPanel | `LogsPanel.tsx` | Logs de um serviço |
-| MonitorPanel | `MonitorPanel.tsx` | Logs agregados do container |
+| MonitorPanel | `MonitorPanel.tsx` | Logs agregados do container ou serviços selecionados |
 | StatusBar | `StatusBar.tsx` | Contadores running/stopped/error |
 | SettingsPanel | `SettingsPanel.tsx` | Preferências de UI e sistema |
 | SettingsSystemTab | `SettingsSystemTab.tsx` | Java runtime, cache rebuild |

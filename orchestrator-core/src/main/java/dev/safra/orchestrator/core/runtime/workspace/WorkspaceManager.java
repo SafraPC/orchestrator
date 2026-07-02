@@ -1,5 +1,23 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.workspace;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.safra.orchestrator.core.runtime.discovery.java.PortExtractor;
+import dev.safra.orchestrator.core.runtime.discovery.java.ProjectScanner;
+import dev.safra.orchestrator.core.runtime.discovery.js.JsProjectScanner;
+import dev.safra.orchestrator.core.runtime.discovery.js.StandaloneJsScanner;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
+import dev.safra.orchestrator.core.runtime.discovery.php.PhpProjectScanner;
+import dev.safra.orchestrator.core.runtime.discovery.php.StandalonePhpScanner;
+import dev.safra.orchestrator.core.runtime.service.ServiceViewMapper;
+import dev.safra.orchestrator.model.ProjectType;
+import dev.safra.orchestrator.model.ServiceDefinition;
+import dev.safra.orchestrator.model.ServiceDescriptor;
+import dev.safra.orchestrator.model.ServiceRuntime;
+import dev.safra.orchestrator.model.ServiceStatus;
+import dev.safra.orchestrator.model.ServiceView;
+import dev.safra.orchestrator.model.Workspace;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -9,18 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
-import dev.safra.orchestrator.model.ServiceDescriptor;
-import dev.safra.orchestrator.model.ServiceRuntime;
-import dev.safra.orchestrator.model.ServiceStatus;
-import dev.safra.orchestrator.model.ServiceView;
-import dev.safra.orchestrator.model.Workspace;
 
 public class WorkspaceManager {
   private final Path stateDir;

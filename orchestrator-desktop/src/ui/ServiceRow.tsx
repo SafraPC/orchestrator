@@ -26,9 +26,16 @@ export function ServiceRow(props: {
   phps: PhpInfo[];
   menuOpen: boolean;
   isDragging: boolean;
+  bulkSelected: boolean;
+  bulkCount: number;
   gripProps: { onMouseDown: (e: React.MouseEvent) => void };
-  onSelect: () => void;
+  onSelect: (event: React.MouseEvent) => void;
+  onBulkToggle: () => void;
+  onBulkRemove: () => void;
+  onBulkAddToContainer: (containerId: string) => Promise<void>;
+  onBulkRemoveFromContainer: (containerId: string) => Promise<void>;
   onMenuToggle: () => void;
+  onContextMenuOpen: () => void;
   onMenuClose: () => void;
   onDelete: () => void;
   onAdd: (s: string, c: string) => Promise<void>;
@@ -36,6 +43,7 @@ export function ServiceRow(props: {
   onSetJava: (name: string, ver: string | null) => Promise<void>;
   onSetPhp: (name: string, ver: string | null) => Promise<void>;
   onSetScript: (name: string, script: string) => Promise<void>;
+  onSetPhpCommand: (service: ServiceDto) => void;
   onSetPort: (service: ServiceDto) => void;
   onResetPort: (name: string) => Promise<void>;
   onSetMvnWrapper: (name: string, enabled: boolean) => Promise<void>;
@@ -57,12 +65,11 @@ export function ServiceRow(props: {
   return (
     <div
       data-drag-item
-      className={`group relative rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-200 ${sel ? "border-accent/25 bg-accent/[0.06] shadow-glow" : "border-white/[0.06] bg-surface-1 hover:border-white/[0.10] hover:bg-surface-2"} ${props.isDragging ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30 bg-accent/[0.06]" : ""}`}
+      className={`group relative rounded-lg border px-3 py-2.5 cursor-pointer transition-all duration-200 ${sel ? "border-accent/25 bg-accent/[0.06] shadow-glow" : "border-white/[0.06] bg-surface-1 hover:border-white/[0.10] hover:bg-surface-2"} ${props.bulkSelected ? "ring-1 ring-danger/30" : ""} ${props.isDragging ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30 bg-accent/[0.06]" : ""}`}
       onClick={props.onSelect}
       onContextMenu={(e) => {
         e.preventDefault();
-        props.onSelect();
-        props.onMenuToggle();
+        props.onContextMenuOpen();
       }}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -119,9 +126,16 @@ export function ServiceRow(props: {
                 onRemove={props.onRemove}
                 onClose={props.onMenuClose}
                 onDelete={props.onDelete}
+                bulkSelected={props.bulkSelected}
+                bulkCount={props.bulkCount}
+                onBulkToggle={props.onBulkToggle}
+                onBulkRemove={props.onBulkRemove}
+                onBulkAddToContainer={props.onBulkAddToContainer}
+                onBulkRemoveFromContainer={props.onBulkRemoveFromContainer}
                 onSetJava={props.onSetJava}
                 onSetPhp={props.onSetPhp}
                 onSetScript={props.onSetScript}
+                onSetPhpCommand={props.onSetPhpCommand}
                 onSetPort={() => props.onSetPort(s)}
                 onSetMvnWrapper={props.onSetMvnWrapper}
               />

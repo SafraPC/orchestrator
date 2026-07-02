@@ -1,6 +1,6 @@
 [package]
 name = "Orchestrator"
-version = "1.0.8"
+version = "1.0.9"
 description = "Orchestrator Desktop (Tauri)"
 authors = ["Leandro Safra"]
 license = "MIT"

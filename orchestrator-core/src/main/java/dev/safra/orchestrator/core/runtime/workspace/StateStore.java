@@ -1,4 +1,4 @@
-package dev.safra.orchestrator.core.runtime;
+package dev.safra.orchestrator.core.runtime.workspace;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;

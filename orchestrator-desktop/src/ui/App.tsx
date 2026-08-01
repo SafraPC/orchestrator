@@ -31,7 +31,7 @@ export function App(props: { onReady?: () => void }) {
   const [containersCollapsed, setContainersCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [killPortOpen, setKillPortOpen] = useState(false);
-  const [sideW, setSideW] = useState(288);
+  const [sideW, setSideW] = useState(300);
   const [svcW, setSvcW] = useState(288);
 
   const { toasts, addToast, removeToast } = useToast();
@@ -202,7 +202,7 @@ export function App(props: { onReady?: () => void }) {
             />
           </div>
         </aside>
-        {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={140} max={320} />}
+        {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={180} max={420} />}
 
         <section className="flex flex-col shrink-0 border-r border-white/[0.04]" style={{ width: svcW }}>
           <div className="px-3 py-2.5 border-b border-white/[0.04] space-y-2">

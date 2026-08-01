@@ -28,8 +28,18 @@ export function KillPortModal(props: {
     if (!valid || busy) return;
     setBusy(true);
     try {
-      await api.killPort(portNum);
-      props.onToast("success", `Porta ${portNum} liberada com sucesso.`);
+      const result = await api.killPort(portNum);
+      const check = await api.checkPortFree(portNum);
+      if (!check.free) {
+        props.onToast("error", `Porta ${portNum} ainda em uso após a tentativa de encerrar.`);
+        return;
+      }
+      props.onToast(
+        "success",
+        result.killed
+          ? `Porta ${portNum} liberada com sucesso.`
+          : `Porta ${portNum} já estava livre.`
+      );
       props.onClose();
     } catch (e) {
       props.onToast("error", e instanceof Error ? e.message : String(e));
@@ -58,7 +68,7 @@ export function KillPortModal(props: {
         </div>
         <div className="p-4 space-y-3">
           <p className="text-2xs text-slate-500">
-            Encerra o processo que estiver usando a porta informada.
+            Encerra o processo na porta e a árvore de processos relacionada (ex.: composer serve).
           </p>
           <input
             ref={inputRef}

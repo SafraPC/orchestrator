@@ -61,7 +61,7 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `setServiceMvnWrapper` | `setServiceMvnWrapper` | Usar `mvnw` do projeto |
 | `rebuildServices` | `rebuildServices` | Re-sincroniza definições |
 | `checkPortFree` | `checkPortFree` | Verifica se porta está livre |
-| `killPort` | `killPort` | Mata processo na porta |
+| `killPort` | `killPort` | Mata processo na porta e árvore relacionada; confirma que a porta ficou livre |
 
 Comandos Tauri fora do core Java (em `main.rs`): `select_folder`, `select_java_folder`, `select_java_file`, `get_runtime_settings`, `set_java_runtime_path`.
 

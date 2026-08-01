@@ -194,8 +194,18 @@ public class CoreRuntime {
       case "killPort" -> {
         int port = IpcParams.reqPort(params);
         boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-        PortProcessKiller.killPort(port, windows);
-        yield om.getNodeFactory().objectNode().put("ok", true).put("message", "Porta " + port + " liberada");
+        boolean killed = PortProcessKiller.killPort(port, windows);
+        if (!PortProcessKiller.isPortFree(port)) {
+          throw new IllegalStateException("Porta " + port + " continua em uso após tentativa de liberação.");
+        }
+        String message = killed
+            ? "Porta " + port + " liberada"
+            : "Porta " + port + " já estava livre";
+        yield om.getNodeFactory().objectNode()
+            .put("ok", true)
+            .put("killed", killed)
+            .put("free", true)
+            .put("message", message);
       }
       default -> throw new IllegalArgumentException("Método desconhecido: " + method);
     };

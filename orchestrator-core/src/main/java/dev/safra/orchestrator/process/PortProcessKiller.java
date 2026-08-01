@@ -20,7 +20,7 @@ public final class PortProcessKiller {
     try {
       int port = Integer.parseInt(portStr.trim());
       if (isPortFree(port)) return;
-      for (int attempt = 0; attempt < 2; attempt++) {
+      for (int attempt = 0; attempt < 3; attempt++) {
         if (windows) {
           killWindowsPort(port);
         } else {
@@ -90,18 +90,45 @@ public final class PortProcessKiller {
   }
 
   private static void killUnixPort(int port) throws Exception {
+    Set<Long> pids = findUnixPids(port);
+    if (pids.isEmpty()) {
+      return;
+    }
+    for (Long pid : pids) {
+      ProcessTreeKiller.killForcibly(pid);
+      new ProcessBuilder("kill", "-9", String.valueOf(pid))
+          .redirectErrorStream(true)
+          .start()
+          .waitFor(3, TimeUnit.SECONDS);
+    }
+    Thread.sleep(200);
+    Set<Long> remaining = findUnixPids(port);
+    for (Long pid : remaining) {
+      ProcessTreeKiller.killForcibly(pid);
+      new ProcessBuilder("kill", "-9", String.valueOf(pid))
+          .redirectErrorStream(true)
+          .start()
+          .waitFor(3, TimeUnit.SECONDS);
+    }
+  }
+
+  private static Set<Long> findUnixPids(int port) throws Exception {
+    Set<Long> pids = new HashSet<>();
     Process lsof = new ProcessBuilder("lsof", "-ti", ":" + port)
         .redirectErrorStream(true).start();
     String output = new String(lsof.getInputStream().readAllBytes()).trim();
     lsof.waitFor(5, TimeUnit.SECONDS);
-    if (output.isEmpty()) return;
+    if (output.isEmpty()) {
+      return pids;
+    }
     for (String pidLine : output.split("\\R")) {
       String pid = pidLine.trim();
-      if (!pid.isEmpty()) {
-        new ProcessBuilder("kill", "-9", pid)
-            .redirectErrorStream(true).start().waitFor(3, TimeUnit.SECONDS);
+      if (pid.isEmpty() || !pid.matches("\\d+")) {
+        continue;
       }
+      pids.add(Long.parseLong(pid));
     }
+    return pids;
   }
 
   private static boolean waitUntilPortFree(int port, int maxAttempts) throws InterruptedException {
@@ -112,16 +139,20 @@ public final class PortProcessKiller {
     return false;
   }
 
-  public static void killPort(int port, boolean windows) {
-    if (isPortFree(port)) return;
+  public static boolean killPort(int port, boolean windows) {
+    if (isPortFree(port)) {
+      return false;
+    }
     try {
-      for (int attempt = 0; attempt < 2; attempt++) {
+      for (int attempt = 0; attempt < 3; attempt++) {
         if (windows) {
           killWindowsPort(port);
         } else {
           killUnixPort(port);
         }
-        if (waitUntilPortFree(port, attempt == 0 ? 20 : 30)) return;
+        if (waitUntilPortFree(port, attempt == 0 ? 25 : 35)) {
+          return true;
+        }
       }
       throw new IllegalStateException("Porta " + port + " continua em uso após tentativa de liberação.");
     } catch (IllegalStateException e) {

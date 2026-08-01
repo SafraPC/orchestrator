@@ -89,7 +89,8 @@ export const api = {
   setServicePort: (name: string, port: number) => core<ServiceDto[]>("setServicePort", { name, port }),
   resetServicePort: (name: string) => core<ServiceDto[]>("resetServicePort", { name }),
   checkPortFree: (port: number) => core<{ free: boolean }>("checkPortFree", { port }),
-  killPort: (port: number) => core<{ ok: boolean; message: string }>("killPort", { port }),
+  killPort: (port: number) =>
+    core<{ ok: boolean; killed: boolean; free: boolean; message: string }>("killPort", { port }),
 
   reorderServices: (order: string[]) => core<void>("reorderServices", { order }),
   reorderContainers: (order: string[]) => core<void>("reorderContainers", { order }),

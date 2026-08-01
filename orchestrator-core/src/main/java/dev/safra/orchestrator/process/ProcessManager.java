@@ -140,26 +140,31 @@ public class ProcessManager {
       return StopResult.notFound(pid);
     }
     ProcessHandle h = opt.get();
-    if (!h.isAlive()) {
+    if (!h.isAlive() && !ProcessTreeKiller.anyAlive(pid)) {
       return StopResult.alreadyStopped(pid);
     }
 
     if (isWindows()) {
       killWindowsTree(pid);
       boolean exited = waitForExit(h, gracefulTimeout);
-      if (exited) return StopResult.stopped(pid, "TASKKILL_TREE");
+      if (exited && !ProcessTreeKiller.anyAlive(pid)) {
+        return StopResult.stopped(pid, "TASKKILL_TREE");
+      }
     }
 
-    boolean termSent = h.destroy();
+    ProcessTreeKiller.terminateGracefully(pid);
     boolean exited = waitForExit(h, gracefulTimeout);
-    if (exited) {
-      return StopResult.stopped(pid, termSent ? "SIGTERM" : "TERM_NOT_SENT");
+    if (exited && !ProcessTreeKiller.anyAlive(pid)) {
+      return StopResult.stopped(pid, "SIGTERM");
     }
 
-    boolean killSent = h.destroyForcibly();
+    ProcessTreeKiller.killForcibly(pid);
     boolean exitedAfterKill = waitForExit(h, killTimeout);
-    if (exitedAfterKill) {
-      return StopResult.stopped(pid, killSent ? "SIGKILL" : "KILL_NOT_SENT");
+    if (exitedAfterKill && !ProcessTreeKiller.anyAlive(pid)) {
+      return StopResult.stopped(pid, "SIGKILL");
+    }
+    if (!ProcessTreeKiller.anyAlive(pid)) {
+      return StopResult.stopped(pid, "SIGKILL");
     }
     return StopResult.failed(pid, "Não foi possível finalizar o processo (TERM+KILL) dentro do timeout.");
   }

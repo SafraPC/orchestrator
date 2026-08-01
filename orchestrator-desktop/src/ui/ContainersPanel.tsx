@@ -135,7 +135,7 @@ export function ContainersPanel(props: {
             const busy = busyContainers[c.id];
             return (
               <div key={c.id} data-drag-item
-                className={`group cursor-pointer rounded-lg px-3 py-2.5 transition-all duration-200 ${sel ? "bg-accent/[0.06] border border-accent/20 shadow-glow" : "border border-white/[0.06] bg-surface-1 hover:bg-surface-2 hover:border-white/[0.10]"} ${activeId === c.id ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30" : ""}`}
+                className={`group cursor-pointer rounded-lg px-3 py-2.5 overflow-hidden transition-all duration-200 ${sel ? "bg-accent/[0.06] border border-accent/20 shadow-glow" : "border border-white/[0.06] bg-surface-1 hover:bg-surface-2 hover:border-white/[0.10]"} ${activeId === c.id ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30" : ""}`}
                 onClick={() => void props.onSelectContainer(sel ? null : c.id)}
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -146,43 +146,49 @@ export function ContainersPanel(props: {
                   <div className={`h-6 w-6 rounded flex items-center justify-center shrink-0 ${busy ? "bg-accent/15" : sel ? "bg-accent/15" : "bg-surface-3"}`}>
                     {busy ? <Spinner /> : <Icon.Box className={`h-3 w-3 ${sel ? "text-accent" : "text-slate-600"}`} />}
                   </div>
-                  <span className={`truncate text-xs font-medium flex-1 min-w-0 ${sel ? "text-slate-100" : "text-slate-300"}`}>{c.name}</span>
-                  {busy && <span className={`badge shrink-0 text-2xs ${busy === "stopping" ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>{busy === "starting" ? "Iniciando..." : busy === "stopping" ? "Parando..." : "Reiniciando..."}</span>}
+                  <div className="flex-1 min-w-0">
+                    <span className={`block truncate text-xs font-medium ${sel ? "text-slate-100" : "text-slate-300"}`} title={c.name}>{c.name}</span>
+                    {busy && (
+                      <span className={`block truncate text-2xs mt-0.5 ${busy === "stopping" ? "text-danger" : "text-accent"}`}>
+                        {busy === "starting" ? "Iniciando..." : busy === "stopping" ? "Parando..." : "Reiniciando..."}
+                      </span>
+                    )}
+                  </div>
                   {!busy && running > 0 && <span className="badge bg-accent/10 text-accent shrink-0">{running}/{total}</span>}
                   {!busy && running === 0 && total > 0 && <span className="badge bg-surface-3 text-slate-500 shrink-0">{total}</span>}
-                  <div className="ml-auto flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {running === 0 && (
-                      <Tooltip text="Iniciar todos">
-                        <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-accent hover:bg-accent/10" disabled={!!busy} onClick={() => handleStartContainer(c)}>
-                          <Icon.Play className="h-3 w-3" />
-                        </button>
-                      </Tooltip>
-                    )}
-                    {running > 0 && (
-                      <Tooltip text="Parar todos">
-                        <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-danger hover:bg-danger/10" disabled={!!busy} onClick={() => handleStopContainer(c)}>
-                          <Icon.Stop className="h-3 w-3" />
-                        </button>
-                      </Tooltip>
-                    )}
-                    {total > 0 && (
-                      <Tooltip text="Reiniciar todos">
-                        <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-accent" disabled={!!busy} onClick={() => handleRestartContainer(c)}>
-                          <Icon.Restart className="h-3 w-3" />
-                        </button>
-                      </Tooltip>
-                    )}
-                    <Tooltip text="Excluir">
-                      <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-danger" disabled={!!busy} onClick={() => setDeleteTarget(c)}>
-                        <Icon.Trash className="h-3 w-3" />
+                </div>
+                <div className="mt-1.5 flex items-center justify-end gap-0.5 min-w-0" onClick={(e) => e.stopPropagation()}>
+                  {running === 0 && (
+                    <Tooltip text="Iniciar todos">
+                      <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-accent hover:bg-accent/10" disabled={!!busy} onClick={() => handleStartContainer(c)}>
+                        <Icon.Play className="h-3 w-3" />
                       </button>
                     </Tooltip>
-                    <Tooltip text="Importar serviços">
-                      <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-accent" disabled={!!busy} onClick={() => void handleImportIntoContainer(c)}>
-                        <Icon.FolderImport className="h-3 w-3" />
+                  )}
+                  {running > 0 && (
+                    <Tooltip text="Parar todos">
+                      <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-danger hover:bg-danger/10" disabled={!!busy} onClick={() => handleStopContainer(c)}>
+                        <Icon.Stop className="h-3 w-3" />
                       </button>
                     </Tooltip>
-                  </div>
+                  )}
+                  {total > 0 && (
+                    <Tooltip text="Reiniciar todos">
+                      <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-accent" disabled={!!busy} onClick={() => handleRestartContainer(c)}>
+                        <Icon.Restart className="h-3 w-3" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip text="Excluir">
+                    <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-danger" disabled={!!busy} onClick={() => setDeleteTarget(c)}>
+                      <Icon.Trash className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="Importar serviços">
+                    <button className="rounded-md p-1 transition-all duration-100 disabled:opacity-30 text-slate-500 hover:bg-white/5 hover:text-accent" disabled={!!busy} onClick={() => void handleImportIntoContainer(c)}>
+                      <Icon.FolderImport className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             );

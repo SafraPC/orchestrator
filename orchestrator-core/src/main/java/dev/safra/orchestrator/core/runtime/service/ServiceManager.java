@@ -337,9 +337,8 @@ public class ServiceManager {
         try {
           Path logFile = Path.of(sd.getDefinition().getLogFile());
           if (Files.exists(logFile)) {
-            List<String> lines = Files.readAllLines(logFile);
-            if (!lines.isEmpty()) {
-              String tail = String.join("\n", lines.subList(Math.max(0, lines.size() - 10), lines.size()));
+            String tail = readLogTail(logFile, 10);
+            if (!tail.isBlank()) {
               logManager.emitLogStatus(name, "Processo terminou. Últimas linhas:\n" + tail);
             }
           }
@@ -353,6 +352,32 @@ public class ServiceManager {
     }, "check-alive-" + name);
     t.setDaemon(true);
     t.start();
+  }
+
+  private static String readLogTail(Path logFile, int maxLines) {
+    try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(logFile.toFile(), "r")) {
+      long len = raf.length();
+      if (len == 0) {
+        return "";
+      }
+      long pos = len - 1;
+      int lines = 0;
+      while (pos >= 0 && lines < maxLines) {
+        raf.seek(pos);
+        int b = raf.read();
+        if (b == '\n') {
+          lines++;
+        }
+        pos--;
+      }
+      long start = Math.max(0, pos + 1);
+      raf.seek(start);
+      byte[] bytes = new byte[(int) (len - start)];
+      raf.readFully(bytes);
+      return new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim();
+    } catch (Exception e) {
+      return "";
+    }
   }
 
   private void validatePhpProject(ServiceDefinition def) {

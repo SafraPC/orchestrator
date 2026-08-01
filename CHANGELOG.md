@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.10 - 2026-08-01
+
+### Fixed
+- Kill Unix process trees on service stop and port kill so `composer serve` children (PHP/Vite) no longer survive as orphans.
+- Guarantee `killPort` only reports success after the port is actually free, with honest feedback when it was already free.
+- Cap log-tail reads and avoid loading entire log files on health check to reduce crashes under noisy PHP/Composer output.
+- Improve containers sidebar layout so names are readable and action icons no longer overflow when a container is running.
+
+### Changed
+- Updated release metadata to `1.0.10`.
+
 ## 1.0.9 - 2026-07-02
 
 ### Added

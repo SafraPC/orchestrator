@@ -19,7 +19,7 @@
 | `core.runtime.discovery.php` | PHP/Composer scanning, PHP launch commands, standalone PHP |
 | `core.runtime.tools` | Open folder, terminal, editor |
 | `model` | Domain: Workspace (aggregate), ServiceDefinition, ServiceView (read model), Container |
-| `process` | OS/process infrastructure |
+| `process` | OS/process infrastructure (ProcessManager, PortProcessKiller, ProcessTreeKiller) |
 
 ## Persistence (`--stateDir`)
 - `workspace.json` — roots, services, containers, removedServices
@@ -42,4 +42,4 @@ mvn clean package -DskipTests # standalone JAR → copy to desktop src-tauri/
 ```
 
 ## Key classes
-CoreRuntime, WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, JavaVersionDetector, WorkspaceDefinitionSync, StateStore
+CoreRuntime, WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, ProcessTreeKiller, PortProcessKiller, JavaVersionDetector, WorkspaceDefinitionSync, StateStore

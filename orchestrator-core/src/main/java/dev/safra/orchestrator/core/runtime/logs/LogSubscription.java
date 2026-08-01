@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 
 public class LogSubscription {
   private static final Charset LOG_CHARSET = Charset.defaultCharset();
+  private static final int MAX_READ_BYTES = 64 * 1024;
   private final String subId;
   private final String service;
   private final Path file;
@@ -158,10 +159,11 @@ public class LogSubscription {
       if (p == len)
         return List.of();
 
+      long toRead = Math.min(len - p, MAX_READ_BYTES);
       raf.seek(p);
-      byte[] bytes = new byte[(int) (len - p)];
+      byte[] bytes = new byte[(int) toRead];
       raf.readFully(bytes);
-      pos.set(len);
+      pos.set(p + toRead);
 
       String chunk = decode(bytes);
       String combined = carry.get() + chunk;

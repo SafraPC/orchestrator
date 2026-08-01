@@ -78,7 +78,7 @@ public class ProcessManager {
         } else {
           String shell = System.getenv("SHELL");
           if (shell == null || shell.isBlank()) shell = "/bin/zsh";
-          cmd = List.of(shell, "-lc", joined);
+          cmd = wrapUnixSession(List.of(shell, "-lc", joined));
         }
       }
 
@@ -152,21 +152,55 @@ public class ProcessManager {
       }
     }
 
-    ProcessTreeKiller.terminateGracefully(pid);
-    boolean exited = waitForExit(h, gracefulTimeout);
-    if (exited && !ProcessTreeKiller.anyAlive(pid)) {
-      return StopResult.stopped(pid, "SIGTERM");
+    boolean isolated = !isWindows() && ProcessTreeKiller.isIsolatedFromSelf(pid);
+    if (isolated) {
+      ProcessTreeKiller.terminateGracefully(pid);
+      boolean exited = waitForExit(h, gracefulTimeout);
+      if (exited && !ProcessTreeKiller.anyAlive(pid)) {
+        return StopResult.stopped(pid, "SIGTERM");
+      }
     }
 
     ProcessTreeKiller.killForcibly(pid);
     boolean exitedAfterKill = waitForExit(h, killTimeout);
-    if (exitedAfterKill && !ProcessTreeKiller.anyAlive(pid)) {
+    if ((exitedAfterKill || !h.isAlive()) && !ProcessTreeKiller.anyAlive(pid)) {
       return StopResult.stopped(pid, "SIGKILL");
     }
     if (!ProcessTreeKiller.anyAlive(pid)) {
       return StopResult.stopped(pid, "SIGKILL");
     }
     return StopResult.failed(pid, "Não foi possível finalizar o processo (TERM+KILL) dentro do timeout.");
+  }
+
+  private List<String> wrapUnixSession(List<String> command) {
+    String python = resolvePython3();
+    if (python == null) {
+      return command;
+    }
+    List<String> wrapped = new ArrayList<>();
+    wrapped.add(python);
+    wrapped.add("-c");
+    wrapped.add("import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])");
+    wrapped.addAll(command);
+    return wrapped;
+  }
+
+  private String resolvePython3() {
+    for (String candidate : List.of("/opt/homebrew/bin/python3", "/usr/bin/python3", "python3")) {
+      try {
+        Path path = Path.of(candidate);
+        if (candidate.equals("python3") || Files.isExecutable(path)) {
+          Process probe = new ProcessBuilder(candidate, "-c", "import os; assert hasattr(os,'setsid')")
+              .redirectErrorStream(true)
+              .start();
+          if (probe.waitFor(3, TimeUnit.SECONDS) && probe.exitValue() == 0) {
+            return candidate;
+          }
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return null;
   }
 
   private void killWindowsTree(long pid) {

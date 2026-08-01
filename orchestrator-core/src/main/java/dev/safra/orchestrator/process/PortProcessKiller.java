@@ -94,16 +94,24 @@ public final class PortProcessKiller {
     if (pids.isEmpty()) {
       return;
     }
+    Set<Long> isolatedPgids = new HashSet<>();
     for (Long pid : pids) {
+      if (ProcessTreeKiller.isIsolatedFromSelf(pid)) {
+        long pgid = ProcessTreeKiller.processGroupId(pid);
+        if (pgid > 1) {
+          isolatedPgids.add(pgid);
+        }
+      }
       ProcessTreeKiller.killForcibly(pid);
-      new ProcessBuilder("kill", "-9", String.valueOf(pid))
+    }
+    for (Long pgid : isolatedPgids) {
+      new ProcessBuilder("kill", "-9", "-" + pgid)
           .redirectErrorStream(true)
           .start()
           .waitFor(3, TimeUnit.SECONDS);
     }
-    Thread.sleep(200);
-    Set<Long> remaining = findUnixPids(port);
-    for (Long pid : remaining) {
+    Thread.sleep(250);
+    for (Long pid : findUnixPids(port)) {
       ProcessTreeKiller.killForcibly(pid);
       new ProcessBuilder("kill", "-9", String.valueOf(pid))
           .redirectErrorStream(true)
@@ -114,7 +122,16 @@ public final class PortProcessKiller {
 
   private static Set<Long> findUnixPids(int port) throws Exception {
     Set<Long> pids = new HashSet<>();
-    Process lsof = new ProcessBuilder("lsof", "-ti", ":" + port)
+    pids.addAll(runLsofPids("lsof", "-nP", "-tiTCP:" + port, "-sTCP:LISTEN"));
+    if (pids.isEmpty()) {
+      pids.addAll(runLsofPids("lsof", "-nP", "-ti", ":" + port));
+    }
+    return pids;
+  }
+
+  private static Set<Long> runLsofPids(String... command) throws Exception {
+    Set<Long> pids = new HashSet<>();
+    Process lsof = new ProcessBuilder(command)
         .redirectErrorStream(true).start();
     String output = new String(lsof.getInputStream().readAllBytes()).trim();
     lsof.waitFor(5, TimeUnit.SECONDS);
@@ -126,21 +143,38 @@ public final class PortProcessKiller {
       if (pid.isEmpty() || !pid.matches("\\d+")) {
         continue;
       }
-      pids.add(Long.parseLong(pid));
+      long value = Long.parseLong(pid);
+      if (value > 0 && value != ProcessHandle.current().pid()) {
+        pids.add(value);
+      }
     }
     return pids;
   }
 
   private static boolean waitUntilPortFree(int port, int maxAttempts) throws InterruptedException {
+    boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
     for (int i = 0; i < maxAttempts; i++) {
       Thread.sleep(300);
-      if (isPortFree(port)) return true;
+      if (!isPortFree(port)) {
+        continue;
+      }
+      if (windows || findUnixPidsQuiet(port).isEmpty()) {
+        return true;
+      }
     }
-    return false;
+    return isPortFree(port) && (windows || findUnixPidsQuiet(port).isEmpty());
+  }
+
+  private static Set<Long> findUnixPidsQuiet(int port) {
+    try {
+      return findUnixPids(port);
+    } catch (Exception ignored) {
+      return Set.of();
+    }
   }
 
   public static boolean killPort(int port, boolean windows) {
-    if (isPortFree(port)) {
+    if (isPortFree(port) && (windows || findUnixPidsQuiet(port).isEmpty())) {
       return false;
     }
     try {

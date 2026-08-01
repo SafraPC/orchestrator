@@ -3,8 +3,9 @@
 ## 1.0.10 - 2026-08-01
 
 ### Fixed
-- Kill Unix process trees on service stop and port kill so `composer serve` children (PHP/Vite) no longer survive as orphans.
-- Guarantee `killPort` only reports success after the port is actually free, with honest feedback when it was already free.
+- Isolate Unix service launches in a new session (`setsid`) so scripts with `trap "kill 0"` (e.g. intranet `composer serve`) cannot kill the Orchestrator process group on stop.
+- Stop shared-PGID services with SIGKILL-only trees; never SIGTERM when the service still shares the JVM process group.
+- Kill Unix ports via LISTEN-focused `lsof`, isolated process groups when safe, and full service trees without touching the JVM.
 - Cap log-tail reads and avoid loading entire log files on health check to reduce crashes under noisy PHP/Composer output.
 - Improve containers sidebar layout so names are readable and action icons no longer overflow when a container is running.
 

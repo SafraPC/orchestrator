@@ -1,0 +1,29 @@
+# discovery/php — PHP project scanning and launch
+
+## Classes
+| Class | Role |
+| --- | --- |
+| PhpProjectScanner | `composer.json` projects (Laravel/Symfony/PHP_COMPOSER) |
+| StandalonePhpScanner | `index.php` without composer/package/pom |
+| PhpLaunchCommands | Launch command builders + script selection apply |
+| PhpComposerScripts | Filters runtime vs QA composer scripts |
+| DockerComposeSupport | Detects compose files and published HTTP ports |
+
+## Recognition rules
+- Laravel: `artisan` or `laravel/framework`
+- Symfony: `symfony.lock` / `bin/console` / symfony packages
+- PHP_COMPOSER: runtime composer scripts **or** web docroot (`index.php`, `public/index.php`, `public/`)
+- Legacy PHP with composer but no scripts is recognized when `index.php` exists at root
+- Composer roots with only lint/test scripts and no web docroot are ignored
+
+## Launch preference (`selectRuntimePhpScript`)
+1. artisan:serve
+2. composer `dev`/`serve`/`start`
+3. docker:compose (when compose file present — ideal for Apache/PHP legacy stacks)
+4. symfony:serve
+5. php:serve (`php -S`, docroot `public` or `.`)
+
+## Docker
+- Script id: `docker:compose` → `docker compose up`
+- Port read from compose preferred services (`app`/`web`/`php`/…)
+- Skips host vendor check on start (entrypoint may run `composer install`)

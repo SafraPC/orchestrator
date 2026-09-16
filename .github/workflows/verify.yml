@@ -39,8 +39,8 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Maven package (core JAR for Tauri)
-        run: mvn -q -DskipTests package
+      - name: Maven test + package (core JAR for Tauri)
+        run: mvn -B package
         working-directory: orchestrator-core
 
       - name: Copy core JAR into Tauri resources

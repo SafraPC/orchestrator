@@ -5,6 +5,7 @@
 src/
   api/           client.ts (IPC), types.ts (DTOs)
   ui/            React components + hooks (see ui/README.md)
+  ui/docker/     Docker section (engine, containers, images, volumes)
 src-tauri/src/
   main.rs        Tauri commands
   core_bridge.rs Java process, stdin/stdout IPC, core_event
@@ -35,8 +36,11 @@ Contract table: repo `docs/reference/IPC.md`. Integration flow: `docs/integratio
 ## Hooks
 See `src/ui/README.md`. App.tsx uses `useWorkspaceData`, `useServiceFilters`, `useCoreEvents`, `useServiceBranchPolling`, `useServiceShortcuts`, `useJavaRuntime`.
 
+## Top-level sections
+`Toolbar` switches `AppSection` (`services` | `docker`). The services `<main>` stays mounted and is hidden via inline `display` so log subscriptions survive the switch; `DockerView` only fetches/polls when `active`.
+
 ## API client
-- `core()` serializes IPC in a queue (Windows safety)
+- `core()` serializes IPC in a queue (Windows safety); optional per-call timeout (docker prune/remove use a longer one)
 - Branch polling: `useServiceBranchPolling` + `listServiceBranches`
 - Tauri-only: folder pickers, `get_runtime_settings`, `set_java_runtime_path`
 - Auto-update: `tauri-plugin-updater` + aviso em `StatusBar`; manifesto `latest.json` na release GitHub

@@ -143,7 +143,8 @@ public final class WorkspaceDefinitionSync {
     }
     if (preferred != null && !preferred.isBlank() && available.contains(preferred)
         && (PhpProjectScanner.isRuntimeComposerScriptName(preferred)
-            || PhpLaunchCommands.isCustomCommandScript(preferred))) {
+            || PhpLaunchCommands.isCustomCommandScript(preferred)
+            || PhpLaunchCommands.isInternalScript(preferred))) {
       return preferred;
     }
     if (available.contains(PhpLaunchCommands.ARTISAN_SERVE)) {
@@ -153,6 +154,9 @@ public final class WorkspaceDefinitionSync {
       if (available.contains(candidate)) {
         return candidate;
       }
+    }
+    if (available.contains(PhpLaunchCommands.DOCKER_COMPOSE)) {
+      return PhpLaunchCommands.DOCKER_COMPOSE;
     }
     if (available.contains(PhpLaunchCommands.SYMFONY_SERVE)) {
       return PhpLaunchCommands.SYMFONY_SERVE;

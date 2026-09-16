@@ -1,0 +1,6 @@
+# workspace
+
+WorkspaceManager: roots, scan, persist. `importRootsAndScan(roots, containerId?)` adds new services and, when `containerId` is set, links every service whose path is under the imported folders (already scanned or new).
+ImportPathMatcher: path-under-root check and container assignment on import.
+WorkspaceDefinitionSync: merge scanned defs with previous (port, java, scripts).
+StateStore: JSON read/write for workspace.json / runtime.json.

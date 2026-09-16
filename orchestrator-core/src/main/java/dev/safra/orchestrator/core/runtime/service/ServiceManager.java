@@ -384,6 +384,9 @@ public class ServiceManager {
     if (def.getProjectType() == ProjectType.STANDALONE_PHP) {
       return;
     }
+    if (PhpLaunchCommands.DOCKER_COMPOSE.equals(def.getSelectedScript())) {
+      return;
+    }
     Path vendor = Path.of(def.getPath()).resolve("vendor/autoload.php");
     if (!Files.isRegularFile(vendor)) {
       throw new IllegalStateException("Dependências PHP ausentes. Execute composer install em " + def.getPath());

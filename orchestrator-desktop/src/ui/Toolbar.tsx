@@ -2,7 +2,19 @@ import { useEffect, useState } from "react";
 import { Icon } from "./Icons";
 import { Tooltip } from "./Tooltip";
 
-export function Toolbar(props: { onSettings: () => void; onKillPort: () => void }) {
+export type AppSection = "services" | "docker";
+
+const SECTIONS: { id: AppSection; label: string; icon: "Box" | "Docker"; hint: string }[] = [
+  { id: "services", label: "Serviços", icon: "Box", hint: "Projetos e containers de aplicação" },
+  { id: "docker", label: "Docker", icon: "Docker", hint: "Containers, imagens e volumes do Docker" },
+];
+
+export function Toolbar(props: {
+  onSettings: () => void;
+  onKillPort: () => void;
+  section: AppSection;
+  onSectionChange: (section: AppSection) => void;
+}) {
   const version = useAppVersion();
   return (
     <header
@@ -26,6 +38,29 @@ export function Toolbar(props: { onSettings: () => void; onKillPort: () => void 
             </span>
           )}
         </div>
+        <div className="h-5 w-px bg-white/[0.06]" />
+        <nav className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] bg-surface-1/70 p-0.5">
+          {SECTIONS.map((section) => {
+            const active = props.section === section.id;
+            const Ic = Icon[section.icon];
+            return (
+              <Tooltip key={section.id} text={section.hint}>
+                <button
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-2xs font-medium transition-all duration-150 ${
+                    active
+                      ? "bg-accent/15 text-accent shadow-glow"
+                      : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-300"
+                  }`}
+                  onClick={() => props.onSectionChange(section.id)}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Ic className="h-3.5 w-3.5" />
+                  <span>{section.label}</span>
+                </button>
+              </Tooltip>
+            );
+          })}
+        </nav>
         <div className="h-5 w-px bg-white/[0.06]" />
         <div className="flex items-center gap-1">
           <Tooltip text="Configurações (⌘ ,)">

@@ -47,8 +47,11 @@ public class ContainerManager {
     if (container == null)
       throw new IllegalArgumentException("Container não encontrado: " + id);
 
-    if (name != null)
+    if (name != null) {
+      if (name.isBlank())
+        throw new IllegalArgumentException("params.name é obrigatório");
       container.setName(name);
+    }
     if (description != null)
       container.setDescription(description);
 

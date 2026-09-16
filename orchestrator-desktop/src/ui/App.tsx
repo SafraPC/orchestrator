@@ -15,7 +15,9 @@ import { SettingsPanel, useSettings } from "./SettingsPanel";
 import { StatusBar } from "./StatusBar";
 import { Toast, useToast } from "./Toast";
 import { Toolbar } from "./Toolbar";
+import type { AppSection } from "./Toolbar";
 import { Tooltip } from "./Tooltip";
+import { DockerView } from "./docker/DockerView";
 import { useCoreEvents } from "./useCoreEvents";
 import { useJavaRuntime } from "./useJavaRuntime";
 import { useServiceBranchPolling } from "./useServiceBranchPolling";
@@ -25,6 +27,7 @@ import { useAppUpdater } from "./useAppUpdater";
 import { useWorkspaceData } from "./useWorkspaceData";
 
 export function App(props: { onReady?: () => void }) {
+  const [section, setSection] = useState<AppSection>("services");
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedContainer, setSelectedContainer] = useState<string | null>(null);
@@ -153,8 +156,13 @@ export function App(props: { onReady?: () => void }) {
       <Toolbar
         onSettings={() => setSettingsOpen(true)}
         onKillPort={() => setKillPortOpen(true)}
+        section={section}
+        onSectionChange={setSection}
       />
-      <main className="flex flex-1 min-h-0">
+      <main
+        className="flex-1 min-h-0"
+        style={{ display: section === "services" ? "flex" : "none" }}
+      >
         <aside
           className="shrink-0 border-r border-white/[0.04]"
           style={{
@@ -210,6 +218,8 @@ export function App(props: { onReady?: () => void }) {
               containers={containers}
               selectedContainer={selectedContainer}
               onSelect={handleSelectContainer}
+              onContainersChanged={refresh}
+              onToast={addToast}
             />
             <ImportSection onImported={refresh} addToast={addToast} />
             <div className="flex items-center gap-1.5">
@@ -273,6 +283,13 @@ export function App(props: { onReady?: () => void }) {
           />
         </section>
       </main>
+
+      <section
+        className="flex-1 min-h-0 flex-col"
+        style={{ display: section === "docker" ? "flex" : "none" }}
+      >
+        <DockerView active={section === "docker"} onToast={addToast} />
+      </section>
 
       <KillPortModal
         open={killPortOpen}

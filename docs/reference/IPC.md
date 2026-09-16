@@ -20,7 +20,7 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `getWorkspace` | `getWorkspace` | Workspace persistido |
 | `setExcludeDirs` | — | Pastas ignoradas no scan |
 | `importRootAndScan` | `importRootAndScan` | Importa root e escaneia |
-| `importRootsAndScan` | `importRootsAndScan` | Vários roots de uma vez |
+| `importRootsAndScan` | `importRootsAndScan` | Vários roots de uma vez; `containerId` opcional vincula os serviços encontrados (novos ou já lidos) ao container |
 | `removeRoot` | — | Remove root do workspace |
 | `scanRoots` | `scanRoots` | Re-escaneia roots existentes |
 | `listServices` | `listServices` | Lista serviços com runtime |
@@ -37,7 +37,7 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `subscribeLogs` | `subscribeLogs` | Assina stream de log |
 | `unsubscribeLogs` | `unsubscribeLogs` | Cancela assinatura |
 | `createContainer` | `createContainer` | Novo container lógico |
-| `updateContainer` | — | Renomeia/descreve container |
+| `updateContainer` | `updateContainer` | Renomeia/descreve container |
 | `deleteContainer` | `deleteContainer` | Remove container (serviços permanecem) |
 | `listContainers` | `listContainers` | Lista containers |
 | `addServiceToContainer` | `addServiceToContainer` | Vincula serviço |
@@ -61,7 +61,24 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `setServiceMvnWrapper` | `setServiceMvnWrapper` | Usar `mvnw` do projeto |
 | `rebuildServices` | `rebuildServices` | Re-sincroniza definições |
 | `checkPortFree` | `checkPortFree` | Verifica se porta está livre |
+| `listListeningPorts` | `listListeningPorts` | Lista portas TCP em LISTEN com pid, processo, comando e origem (`cursor`, `vscode`, `ide`, `terminal`, `docker`, `runtime`, `system`); ordena por origem dev/editor/terminal primeiro (portas 3000–9999 + comuns na frente) e `system` sempre por último |
 | `killPort` | `killPort` | Mata processo na porta e árvore relacionada; confirma que a porta ficou livre |
+
+### Docker (containers reais, não os containers lógicos do workspace)
+
+| Método | `api/client.ts` | Descrição |
+| --- | --- | --- |
+| `dockerGetStatus` | `dockerGetStatus` | Estado do engine: CLI encontrada, daemon respondendo, versões, contexto, provider (`COLIMA`/`DOCKER_DESKTOP`/`SYSTEMD`), Colima disponível/rodando, comando de start |
+| `dockerStartEngine` | `dockerStartEngine` | Inicia o daemon em background com o comando salvo (ou o informado em `command`, que passa a ser persistido). Retorna imediatamente; progresso via eventos |
+| `dockerSetStartCommand` | `dockerSetStartCommand` | Persiste o comando de start em `docker.json` e devolve o status atualizado |
+| `dockerListResources` | `dockerListResources` | Inventário completo: containers, imagens, volumes e `docker system df`. Nunca lança quando o engine está parado — devolve `available:false` com `message` |
+| `dockerStartContainer` | `dockerStartContainer` | `docker start <id>` |
+| `dockerStopContainer` | `dockerStopContainer` | `docker stop <id>` |
+| `dockerRestartContainer` | `dockerRestartContainer` | `docker restart <id>` |
+| `dockerRemoveResources` | `dockerRemoveResources` | Remoção em lote de tipos mistos: `targets:[{kind,id}]` com `kind` em `CONTAINER`/`IMAGE`/`VOLUME`. Ordena containers → imagens → volumes e devolve um resultado por item |
+| `dockerPrune` | `dockerPrune` | Limpeza por escopo: `scopes:[CONTAINERS,IMAGES,VOLUMES,BUILD_CACHE,NETWORKS]` + `removeUnusedImages` para `image prune --all` |
+
+Eventos Docker: `dockerEngineLog` (`{line}`, saída do comando de start) e `dockerEngine` (snapshot de `dockerGetStatus` durante a inicialização).
 
 Comandos Tauri fora do core Java (em `main.rs`): `select_folder`, `select_java_folder`, `select_java_file`, `get_runtime_settings`, `set_java_runtime_path`.
 

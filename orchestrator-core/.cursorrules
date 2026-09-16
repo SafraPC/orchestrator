@@ -10,20 +10,23 @@
 | `core` | Main, Args, Json |
 | `core.ipc` | IpcRequest/Response/Event, IpcParams, IpcEventEmitter |
 | `core.runtime` | CoreRuntime IPC/lifecycle coordinator |
-| `core.runtime.workspace` | Workspace state, roots, scan orchestration, persistence |
+| `core.runtime.workspace` | Workspace state, roots, scan orchestration, persistence; `importRootsAndScan` + optional `containerId` links services under imported paths |
 | `core.runtime.service` | Service lifecycle/configuration, branch read model, ServiceView mapping |
 | `core.runtime.container` | Logical container CRUD and service links |
 | `core.runtime.logs` | Log files, subscriptions, core log events |
 | `core.runtime.discovery.java` | Spring Boot/Maven scanning and Java port extraction |
 | `core.runtime.discovery.js` | Node/JS/HTML scanning, framework detection, JS launch commands |
-| `core.runtime.discovery.php` | PHP/Composer scanning, PHP launch commands, standalone PHP |
+| `core.runtime.discovery.php` | PHP/Composer scanning (incl. legacy index.php), docker compose launch, standalone PHP |
 | `core.runtime.tools` | Open folder, terminal, editor |
+| `core.runtime.docker` | Real Docker via CLI: engine status/start (Colima aware), containers/images/volumes, batch remove, prune. See local `.cursorrules` |
 | `model` | Domain: Workspace (aggregate), ServiceDefinition, ServiceView (read model), Container |
-| `process` | OS/process infrastructure (ProcessManager, PortProcessKiller, ProcessTreeKiller) |
+| `model.docker` | Docker read models: DockerEngineStatus, DockerInventory, container/image/volume summaries |
+| `process` | OS/process infrastructure (ProcessManager, PortProcessKiller, ProcessTreeKiller, ListeningPortScanner, DevPortHeuristics, ProcessSnapshot) |
 
 ## Persistence (`--stateDir`)
 - `workspace.json` — roots, services, containers, removedServices
 - `runtime.json` — per-service pid, status, timestamps
+- `docker.json` — engineStartCommand (comando de start do daemon/Colima)
 
 ## Critical rules
 - Container delete never removes services — only clears containerIds
@@ -31,6 +34,7 @@
 - removedServices excluded from scan; importRootAndScan clears the set
 - Ports from application.properties/yml; JS customPort only when portStrategy=CLI
 - listServices re-reads package.json for scripts/port/strategy sync
+- Docker: `Container` (model) is a logical group of services; real Docker entities are always `Docker*`
 
 ## IPC
 Full method list: repo `docs/reference/IPC.md`. Flow diagrams: `docs/integration/INTEGRATION.md`.

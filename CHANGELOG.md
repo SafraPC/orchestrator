@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.0.0 - 2026-09-16
+
+### Added
+- Added a top-level Docker section to view and manage the real Docker engine, separate from the workspace's logical containers.
+- Added Docker engine status detection (CLI, daemon, context, provider) with Colima awareness, plus an option to start the daemon with a configurable command persisted in `docker.json`.
+- Added Docker containers, images, and volumes listings with disk usage, in-use markers, text filter, and container sorting by state (default), name, image, or published port.
+- Added container lifecycle actions (start, stop, restart) and mixed-type batch removal, allowing containers, images, and volumes to be selected and removed together.
+- Added scoped pruning for containers, images, volumes, build cache, and networks, with reclaimable space shown per scope.
+
+### Fixed
+- Treat Docker CLI output as authoritative instead of the exit code alone, since `docker rm --force` exits 0 while printing `Error response from daemon` for missing resources.
+- Order batch removals as containers, then images, then volumes, so removing a resource still referenced by a container no longer fails.
+- Resolve `docker` and `colima` binaries outside the shell `PATH`, so the packaged app launched from Finder still finds them.
+- Normalize Docker resource kinds and prune scopes with `Locale.ROOT`, preventing failures under locales such as Turkish.
+- Measure tooltip size before positioning, so tooltips stay centered on their trigger and flip below instead of overlapping the toolbar.
+- Prevent release checksums from being computed over unsigned Windows installers when SignPath signing is enabled.
+
+### Changed
+- CI now runs the core test suite instead of skipping it.
+- Updated release metadata to `2.0.0`.
+
 ## 1.0.10 - 2026-08-01
 
 ### Fixed

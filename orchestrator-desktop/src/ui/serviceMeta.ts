@@ -51,8 +51,9 @@ export function formatScriptLabel(scriptId: string, projectType?: ProjectType): 
   if (customCommand) return customCommand;
   if (scriptId === "artisan:serve") return "artisan serve";
   if (scriptId === "symfony:serve") return "symfony serve";
-  if (scriptId === "php:serve") return "php -S (public)";
-  if (usesPhpScripts(projectType) && scriptId !== "artisan:serve" && scriptId !== "symfony:serve" && scriptId !== "php:serve") {
+  if (scriptId === "docker:compose") return "docker compose up";
+  if (scriptId === "php:serve") return "php -S";
+  if (usesPhpScripts(projectType) && scriptId !== "artisan:serve" && scriptId !== "symfony:serve" && scriptId !== "php:serve" && scriptId !== "docker:compose") {
     return `composer run ${scriptId}`;
   }
   return scriptId;

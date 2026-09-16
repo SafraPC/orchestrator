@@ -15,6 +15,7 @@ public final class PhpLaunchCommands {
   public static final String ARTISAN_SERVE = "artisan:serve";
   public static final String SYMFONY_SERVE = "symfony:serve";
   public static final String PHP_BUILTIN_SERVE = "php:serve";
+  public static final String DOCKER_COMPOSE = "docker:compose";
   public static final String CUSTOM_COMMAND_PREFIX = "custom:";
   private static final List<String> PHP_WEB_RUNTIME_OPTIONS = List.of(
       "-d", "display_errors=0",
@@ -40,7 +41,8 @@ public final class PhpLaunchCommands {
   public static boolean isInternalScript(String scriptId) {
     return ARTISAN_SERVE.equals(scriptId)
         || SYMFONY_SERVE.equals(scriptId)
-        || PHP_BUILTIN_SERVE.equals(scriptId);
+        || PHP_BUILTIN_SERVE.equals(scriptId)
+        || DOCKER_COMPOSE.equals(scriptId);
   }
 
   public static boolean isCustomCommandScript(String scriptId) {
@@ -90,6 +92,16 @@ public final class PhpLaunchCommands {
     }
     if (PHP_BUILTIN_SERVE.equals(normalized)) {
       def.setCommand(builtinServerCommand(resolvePublicDocroot(Path.of(def.getPath())), port));
+      return;
+    }
+    if (DOCKER_COMPOSE.equals(normalized)) {
+      def.setCommand(DockerComposeSupport.upCommand());
+      def.setPortStrategy("UNSUPPORTED");
+      def.setCustomPort(null);
+      Integer composePort = DockerComposeSupport.readPublishedHttpPort(Path.of(def.getPath()));
+      if (composePort != null) {
+        def.setDetectedPort(composePort);
+      }
       return;
     }
     if (type == ProjectType.STANDALONE_PHP) {

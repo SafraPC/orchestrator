@@ -116,12 +116,18 @@ public class WorkspaceManager {
   public JsonNode importRootAndScan(String root) {
     if (root == null || root.isBlank())
       throw new IllegalArgumentException("params.root é obrigatório");
-    return importRootsAndScan(List.of(root));
+    return importRootsAndScan(List.of(root), null);
   }
 
   public JsonNode importRootsAndScan(List<String> roots) {
+    return importRootsAndScan(roots, null);
+  }
+
+  public JsonNode importRootsAndScan(List<String> roots, String containerId) {
     if (roots == null || roots.isEmpty())
       throw new IllegalArgumentException("params.roots é obrigatório");
+    if (containerId != null && !containerId.isBlank() && !workspace.getContainers().containsKey(containerId))
+      throw new IllegalArgumentException("Container não encontrado: " + containerId);
 
     List<Path> importedPaths = new ArrayList<>();
     List<ServiceDefinition> found = new ArrayList<>();
@@ -145,16 +151,16 @@ public class WorkspaceManager {
         continue;
       if (def.getProjectType() == null)
         continue;
-      Path defPath = Path.of(def.getPath());
-      boolean underImported = importedPaths.stream().anyMatch(defPath::startsWith);
-      if (!underImported)
+      if (!ImportPathMatcher.isUnderImported(def.getPath(), importedPaths))
         continue;
       workspace.getServices().add(def);
       existingNames.add(def.getName());
       added++;
     }
 
-    if (added > 0) {
+    int assigned = ImportPathMatcher.assignContainer(workspace.getServices(), importedPaths, containerId);
+
+    if (added > 0 || assigned > 0) {
       syncServiceOrder();
       persistWorkspace();
     }

@@ -189,7 +189,7 @@ jobs:
         id: upload-windows-unsigned
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installers-unsigned
+          name: windows-unsigned-for-signpath
           path: |
             orchestrator-desktop/src-tauri/target/release/bundle/msi/*.msi
             orchestrator-desktop/src-tauri/target/release/bundle/nsis/*.exe

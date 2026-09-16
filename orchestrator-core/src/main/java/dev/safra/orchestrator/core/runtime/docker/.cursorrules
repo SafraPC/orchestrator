@@ -1,0 +1,34 @@
+# runtime/docker — integração com o Docker real
+
+Responsabilidade: falar com a CLI do Docker (e com o Colima) para ler e manipular containers, imagens e volumes **reais**.
+
+Não confundir com `runtime/container`: lá `Container` é um agrupamento lógico de serviços do workspace. Aqui tudo é prefixado com `Docker`.
+
+## Entrada
+
+`DockerManager` é a única classe que `CoreRuntime` conhece. Todos os métodos devolvem `JsonNode` e nunca vazam detalhes de processo para a UI.
+
+## Classes
+
+| Classe | Responsabilidade |
+|--------|------------------|
+| DockerManager | Fachada dos métodos IPC `docker*`; monta status, inventário e resultados |
+| DockerCli | Resolve binários (`docker`, `colima`) e executa comandos com timeout |
+| DockerEngineProbe | Monta `DockerEngineStatus`; detecta Colima e recupera contexto |
+| DockerEngineLauncher | Sobe o daemon em background, faz stream da saída e aguarda ficar pronto |
+| DockerInventoryReader | Lê containers/imagens/volumes/`system df` e marca o que está em uso |
+| DockerResourceActions | Lifecycle de container, remoção em lote e prune por escopo |
+| DockerSettingsStore | Persiste `engineStartCommand` em `docker.json` no `--stateDir` |
+
+Modelos (records) em `dev.safra.orchestrator.model.docker`.
+
+## Regras que não devem regredir
+
+- **`ok()` não basta**: `docker rm --force` de um recurso inexistente sai com código 0 e imprime `Error response from daemon:`. Sempre usar `Result.succeeded()` (exit code + ausência de erro no output).
+- **Ordem da remoção em lote**: containers → imagens → volumes (`orderForRemoval`). Inverter faz a remoção de imagem/volume em uso falhar.
+- **Leitura de stdout/stderr em threads**: `readAllBytes()` direto no stdout impede o timeout de agir e pode travar em comandos que escrevem muito em stderr.
+- **Contexto do Docker**: o app pode subir sem `DOCKER_HOST`. Se `docker version` não trouxer `Server`, `DockerEngineProbe` varre `docker context ls` e fixa o contexto que responde em `DockerCli`.
+- **PATH reduzido**: app aberto pelo Finder não herda o PATH do shell. `DockerCli` procura em `which`/`where` e depois em Homebrew, `/usr/local/bin`, `~/.local/bin`, `~/.docker/bin`, `~/.rd/bin` e Docker Desktop.
+- **`--all` no prune de volume** não existe em CLI antiga; há retry automático sem a flag.
+- **`listResources` degrada**: engine parado devolve `DockerInventory.unavailable(message)` em vez de erro.
+- Start do engine é assíncrono e single-flight; progresso vai por eventos `dockerEngineLog`/`dockerEngine`.

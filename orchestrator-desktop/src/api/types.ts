@@ -92,3 +92,105 @@ export type ActiveJavaInfoDto = {
 };
 
 export type ServiceBranchMapDto = Record<string, string | null>;
+
+export type DockerEngineProvider = "COLIMA" | "DOCKER_DESKTOP" | "SYSTEMD" | "UNKNOWN";
+
+export type DockerEngineStatusDto = {
+  cliAvailable: boolean;
+  cliPath?: string | null;
+  engineRunning: boolean;
+  starting: boolean;
+  clientVersion?: string | null;
+  serverVersion?: string | null;
+  context?: string | null;
+  provider: DockerEngineProvider;
+  colimaAvailable: boolean;
+  colimaRunning: boolean;
+  colimaProfile?: string | null;
+  startCommand?: string | null;
+  startCommandConfigured: boolean;
+  startCommandRequired: boolean;
+  message?: string | null;
+};
+
+export type DockerResourceKind = "CONTAINER" | "IMAGE" | "VOLUME";
+
+export type DockerContainerDto = {
+  id: string;
+  name: string;
+  image: string;
+  command: string;
+  state: string;
+  status: string;
+  ports: string;
+  createdAt: string;
+  runningFor: string;
+  size: string;
+  project?: string | null;
+  service?: string | null;
+  localVolumes: number;
+};
+
+export type DockerImageDto = {
+  id: string;
+  repository: string;
+  tag: string;
+  size: string;
+  createdAt: string;
+  createdSince: string;
+  dangling: boolean;
+  inUse: boolean;
+};
+
+export type DockerVolumeDto = {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  scope: string;
+  anonymous: boolean;
+  inUse: boolean;
+};
+
+export type DockerDiskUsageDto = {
+  type: string;
+  totalCount: string;
+  active: string;
+  size: string;
+  reclaimable: string;
+};
+
+export type DockerInventoryDto = {
+  available: boolean;
+  message?: string | null;
+  containers: DockerContainerDto[];
+  images: DockerImageDto[];
+  volumes: DockerVolumeDto[];
+  diskUsage: DockerDiskUsageDto[];
+};
+
+export type DockerOperationResultDto = {
+  kind: string;
+  id: string;
+  ok: boolean;
+  message: string;
+};
+
+export type DockerPruneScope = "CONTAINERS" | "IMAGES" | "VOLUMES" | "BUILD_CACHE" | "NETWORKS";
+
+export type DockerResourceTarget = {
+  kind: DockerResourceKind;
+  id: string;
+};
+
+export type PortOrigin = "cursor" | "vscode" | "ide" | "terminal" | "docker" | "runtime" | "system";
+
+export type ListeningPortDto = {
+  port: number;
+  pid: number;
+  processName: string;
+  command: string;
+  address: string;
+  origin: PortOrigin;
+  devRelated: boolean;
+  devPort: boolean;
+};

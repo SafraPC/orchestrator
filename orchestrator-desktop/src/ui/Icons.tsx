@@ -274,6 +274,49 @@ export const Icon = {
       <path d="M9.2 1.2L6.1 8.1H3.4l5.8 6.7V9.4l2.1-4.5 2.2 4.5v5.4L14.6 8.1h-2.7L9.2 1.2z" />
     </svg>
   ),
+  Docker: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12.6 9.3h2.3v2.4h-2.3V9.3zm-3 0h2.3v2.4H9.6V9.3zm-3 0h2.3v2.4H6.6V9.3zm-3 0h2.3v2.4H3.6V9.3zm3-2.9h2.3v2.4H6.6V6.4zm3 0h2.3v2.4H9.6V6.4zm3 0h2.3v2.4h-2.3V6.4zm3 2.9h2.3v2.4h-2.3V9.3zm-6-5.8h2.3v2.4H9.6V3.5z" />
+      <path d="M23 11.3c-.5-.4-1.7-.5-2.6-.3-.1-.9-.6-1.6-1.4-2.3l-.5-.3-.3.5c-.4.6-.6 1.5-.5 2.2.1.4.2.8.5 1.1-.2.1-.5.3-.8.4-.6.2-1.2.3-1.9.3H1c-.1 1.5.2 3.4 1.3 4.9 1.2 1.5 3 2.3 5.4 2.3 5.3 0 9.2-2.4 11.1-6.9 1 0 2.1-.2 2.8-1 .2-.2.5-.5.6-.9l.1-.3-.3-.2z" />
+    </svg>
+  ),
+  Layers: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M8 2L2 5l6 3 6-3-6-3z" />
+      <path d="M2 8.5l6 3 6-3M2 11.5l6 3 6-3" />
+    </svg>
+  ),
+  Database: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <ellipse cx="8" cy="4" rx="5" ry="2" />
+      <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4" />
+      <path d="M3 8c0 1.1 2.2 2 5 2s5-.9 5-2" />
+    </svg>
+  ),
+  Refresh: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M13.5 8a5.5 5.5 0 01-9.4 3.9M2.5 8a5.5 5.5 0 019.4-3.9" />
+      <path d="M11.5 2v2.5H14M4.5 14v-2.5H2" />
+    </svg>
+  ),
+  Power: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M8 2v5" />
+      <path d="M4.6 4.6a4.8 4.8 0 106.8 0" />
+    </svg>
+  ),
+  Alert: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M8 2.5l5.5 10H2.5L8 2.5z" />
+      <path d="M8 6.5v3M8 11.2v.3" />
+    </svg>
+  ),
+  Sort: (p: { className?: string }) => (
+    <svg className={p.className} viewBox="0 0 16 16" fill="none" stroke="currentColor" {...s}>
+      <path d="M2.5 4h8M2.5 8h5.5M2.5 12h3" />
+      <path d="M12 6.5v6M10.2 10.7L12 12.5l1.8-1.8" />
+    </svg>
+  ),
   Hono: (p: { className?: string }) => (
     <svg className={p.className} viewBox="0 0 16 16" fill="currentColor">
       <path d="M8 2.2c2.2 1.8 3.6 3.8 3.6 5.8 0 2.4-1.6 4.3-3.6 5.8-2-1.5-3.6-3.4-3.6-5.8 0-2 1.4-4 3.6-5.8z" opacity="0.35" />

@@ -1,10 +1,12 @@
 import { useCallback, useState } from "react";
 import { api } from "../api/client";
 import type { ContainerDto, ServiceDto } from "../api/types";
+import { ContainerEditOverlay } from "./ContainerEditModal";
 import { Icon } from "./Icons";
 import { Modal } from "./Modal";
 import { Tooltip } from "./Tooltip";
 import type { ToastType } from "./Toast";
+import { useContainerEdit } from "./useContainerEdit";
 import { useDragReorder } from "./useDragReorder";
 
 export function ContainersPanel(props: {
@@ -21,6 +23,7 @@ export function ContainersPanel(props: {
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ContainerDto | null>(null);
   const [busyContainers, setBusyContainers] = useState<Record<string, "starting" | "stopping" | "restarting">>({});
+  const editor = useContainerEdit(props.onContainersChanged, props.onToast);
 
   const handleReorder = useCallback((reordered: ContainerDto[]) => {
     props.onContainersReorder?.(reordered);
@@ -89,17 +92,15 @@ export function ContainersPanel(props: {
       if (!picked?.trim()) return;
       const paths = picked.trim().split("|").filter(Boolean);
       const before = await api.listServices();
-      const beforeNames = new Set(before.map((s) => s.name));
-      const result = await api.importRootsAndScan(paths);
+      const beforeInContainer = new Set(before.filter((s) => s.containerIds?.includes(c.id)).map((s) => s.name));
+      const result = await api.importRootsAndScan(paths, c.id);
       const all = Array.isArray(result) ? result : [];
-      const added = all.filter((s) => !beforeNames.has(s.name));
-      if (added.length === 0) {
-        props.onToast?.("info", "Nenhum serviço novo encontrado.");
-        await props.onRefresh();
-        return;
+      const linked = all.filter((s) => s.containerIds?.includes(c.id) && !beforeInContainer.has(s.name));
+      if (linked.length > 0) {
+        props.onToast?.("success", `${linked.length} serviço(s) importado(s) em "${c.name}"`);
+      } else {
+        props.onToast?.("info", "Nenhum serviço novo para este container.");
       }
-      for (const s of added) await api.addServiceToContainer(s.name, c.id);
-      props.onToast?.("success", `${added.length} serviço(s) importado(s) em "${c.name}"`);
       await props.onRefresh();
     } catch (e) {
       props.onToast?.("error", e instanceof Error ? e.message : String(e));
@@ -137,6 +138,7 @@ export function ContainersPanel(props: {
               <div key={c.id} data-drag-item
                 className={`group cursor-pointer rounded-lg px-3 py-2.5 overflow-hidden transition-all duration-200 ${sel ? "bg-accent/[0.06] border border-accent/20 shadow-glow" : "border border-white/[0.06] bg-surface-1 hover:bg-surface-2 hover:border-white/[0.10]"} ${activeId === c.id ? "opacity-40 scale-[0.98] shadow-lg shadow-accent/10 border-accent/30" : ""}`}
                 onClick={() => void props.onSelectContainer(sel ? null : c.id)}
+                onContextMenu={(e) => editor.openMenu(c, e)}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="shrink-0 cursor-grab active:cursor-grabbing text-slate-600 opacity-40 group-hover:opacity-100 group-hover:text-slate-400 transition-all"
@@ -148,6 +150,9 @@ export function ContainersPanel(props: {
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className={`block truncate text-xs font-medium ${sel ? "text-slate-100" : "text-slate-300"}`} title={c.name}>{c.name}</span>
+                    {c.description?.trim() && (
+                      <span className="block truncate text-2xs mt-0.5 text-slate-500" title={c.description}>{c.description}</span>
+                    )}
                     {busy && (
                       <span className={`block truncate text-2xs mt-0.5 ${busy === "stopping" ? "text-danger" : "text-accent"}`}>
                         {busy === "starting" ? "Iniciando..." : busy === "stopping" ? "Parando..." : "Reiniciando..."}
@@ -201,6 +206,14 @@ export function ContainersPanel(props: {
           )}
         </div>
       </div>
+      <ContainerEditOverlay
+        menu={editor.menu}
+        editTarget={editor.editTarget}
+        onCloseMenu={editor.closeMenu}
+        onStartEdit={editor.startEdit}
+        onCancel={editor.cancelEdit}
+        onConfirm={editor.save}
+      />
       <Modal
         open={!!deleteTarget}
         title="Excluir container"

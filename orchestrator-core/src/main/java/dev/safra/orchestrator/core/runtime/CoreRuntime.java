@@ -6,6 +6,7 @@ import dev.safra.orchestrator.core.ipc.IpcEventEmitter;
 import dev.safra.orchestrator.core.ipc.IpcParams;
 import dev.safra.orchestrator.core.runtime.container.ContainerManager;
 import dev.safra.orchestrator.core.runtime.discovery.java.PortExtractor;
+import dev.safra.orchestrator.core.runtime.docker.DockerManager;
 import dev.safra.orchestrator.core.runtime.logs.LogFileWriter;
 import dev.safra.orchestrator.core.runtime.logs.LogManager;
 import dev.safra.orchestrator.core.runtime.service.GitBranchResolver;
@@ -16,6 +17,7 @@ import dev.safra.orchestrator.core.runtime.workspace.StateStore;
 import dev.safra.orchestrator.core.runtime.workspace.WorkspaceManager;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.process.JavaVersionDetector;
+import dev.safra.orchestrator.process.ListeningPortScanner;
 import dev.safra.orchestrator.process.PhpVersionDetector;
 import dev.safra.orchestrator.process.PortProcessKiller;
 import dev.safra.orchestrator.process.ProcessManager;
@@ -37,6 +39,7 @@ public class CoreRuntime {
   private final ServiceManager serviceManager;
   private final ServiceConfigurator serviceConfigurator;
   private final ContainerManager containerManager;
+  private final DockerManager dockerManager;
   private final LogManager logManager;
   private final ExternalToolLauncher launcher;
   private final ProcessManager processManager;
@@ -64,6 +67,7 @@ public class CoreRuntime {
     this.serviceConfigurator = new ServiceConfigurator(om, serviceManager, workspaceManager, processManager, emitEvent);
     this.containerManager = new ContainerManager(om, () -> workspaceManager.getWorkspace(),
         () -> workspaceManager.persistWorkspace());
+    this.dockerManager = new DockerManager(om, store, stateDir, emitEvent);
 
     startProcessMonitor();
   }
@@ -77,7 +81,8 @@ public class CoreRuntime {
       case "getWorkspace" -> om.valueToTree(workspaceManager.getWorkspace());
       case "setExcludeDirs" -> workspaceManager.setExcludeDirs(IpcParams.stringList(params, "excludeDirs"));
       case "importRootAndScan" -> workspaceManager.importRootAndScan(IpcParams.text(params, "root"));
-      case "importRootsAndScan" -> workspaceManager.importRootsAndScan(IpcParams.stringList(params, "roots"));
+      case "importRootsAndScan" -> workspaceManager.importRootsAndScan(
+          IpcParams.stringList(params, "roots"), IpcParams.text(params, "containerId"));
       case "removeRoot" -> workspaceManager.removeRoot(IpcParams.text(params, "root"));
       case "scanRoots" -> workspaceManager.scanRoots();
       case "listServices" -> {
@@ -187,6 +192,18 @@ public class CoreRuntime {
         emitEvent.accept("services", result);
         yield result;
       }
+      case "dockerGetStatus" -> dockerManager.getStatus();
+      case "dockerStartEngine" -> dockerManager.startEngine(IpcParams.text(params, "command"));
+      case "dockerSetStartCommand" -> dockerManager.setStartCommand(IpcParams.text(params, "command"));
+      case "dockerListResources" -> dockerManager.listResources();
+      case "dockerStartContainer" -> dockerManager.startContainer(IpcParams.text(params, "id"));
+      case "dockerStopContainer" -> dockerManager.stopContainer(IpcParams.text(params, "id"));
+      case "dockerRestartContainer" -> dockerManager.restartContainer(IpcParams.text(params, "id"));
+      case "dockerRemoveResources" -> dockerManager.removeResources(
+          params == null ? null : params.get("targets"), IpcParams.bool(params, "force", true));
+      case "dockerPrune" -> dockerManager.prune(
+          IpcParams.stringList(params, "scopes"), IpcParams.bool(params, "removeUnusedImages", false));
+      case "listListeningPorts" -> om.valueToTree(ListeningPortScanner.scan());
       case "checkPortFree" -> {
         int port = IpcParams.reqPort(params);
         yield om.getNodeFactory().objectNode().put("free", PortProcessKiller.isPortFree(port));

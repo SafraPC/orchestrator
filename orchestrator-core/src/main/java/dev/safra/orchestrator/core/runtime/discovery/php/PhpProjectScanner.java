@@ -14,18 +14,11 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 public class PhpProjectScanner {
   private static final Set<String> SKIP_DIRS = Set.of(
       ".git", "target", "node_modules", "vendor", ".idea", ".next", "dist", "build", ".turbo", ".cache");
-  private static final Set<String> NON_RUNTIME_SCRIPTS = Set.of(
-      "test", "tests", "lint", "cs-fix", "cs", "stan", "phpstan", "psalm", "check", "format",
-      "analyse", "analysis", "static-analysis", "qa", "quality", "rector", "pest", "phpunit",
-      "php-cs-fixer", "deptrac", "infection", "fix",
-      "post-autoload-dump", "post-root-package-install", "post-create-project-cmd",
-      "post-update-cmd", "pre-autoload-dump", "install-cmd");
 
   private final ObjectMapper om;
   private final Path logsDir;
@@ -45,10 +38,17 @@ public class PhpProjectScanner {
     if (Files.isRegularFile(dir.resolve("public/index.php"))) {
       return true;
     }
+    if (Files.isRegularFile(dir.resolve("index.php"))) {
+      return true;
+    }
     if (Files.isRegularFile(dir.resolve("symfony.lock"))) {
       return true;
     }
     return false;
+  }
+
+  public static boolean isRuntimeComposerScriptName(String name) {
+    return PhpComposerScripts.isRuntimeScriptName(name);
   }
 
   public List<ServiceDefinition> scanRoot(Path root, List<String> excludeDirs) {
@@ -87,7 +87,7 @@ public class PhpProjectScanner {
           if (Files.exists(dir.resolve("pom.xml"))) {
             return FileVisitResult.CONTINUE;
           }
-          ServiceDefinition def = parseComposerJson(file, dir);
+          ServiceDefinition def = parseComposerJson(dir);
           if (def != null) {
             out.add(def);
             foundProjectDirs.add(dir);
@@ -123,7 +123,7 @@ public class PhpProjectScanner {
     }
   }
 
-  private ServiceDefinition parseComposerJson(Path composerFile, Path dir) {
+  private ServiceDefinition parseComposerJson(Path dir) {
     try {
       PhpMetadata metadata = readMetadata(dir, null);
       if (metadata == null) {
@@ -170,8 +170,10 @@ public class PhpProjectScanner {
       scripts.add(preferredScript);
     }
     String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(preferredScript, scripts);
-    Integer port = extractPort(dir, root, selected, type);
-    String portStrategy = isComposerScript(selected) ? "UNSUPPORTED" : PhpLaunchCommands.defaultPortStrategy(type);
+    Integer port = extractPort(dir, selected, type);
+    String portStrategy = PhpLaunchCommands.DOCKER_COMPOSE.equals(selected) || isComposerScript(selected)
+        ? "UNSUPPORTED"
+        : PhpLaunchCommands.defaultPortStrategy(type);
     return new PhpMetadata(type, scripts, selected, port, portStrategy, extractPhpVersion(root));
   }
 
@@ -189,11 +191,10 @@ public class PhpProjectScanner {
         || hasPackage(root, "symfony/runtime")) {
       return ProjectType.SYMFONY;
     }
-    JsonNode scripts = root.path("scripts");
-    if (!scripts.isObject() || scripts.isEmpty()) {
-      return null;
+    if (!PhpComposerScripts.extractRuntimeScripts(root).isEmpty() || hasWebDocroot(dir)) {
+      return ProjectType.PHP_COMPOSER;
     }
-    return ProjectType.PHP_COMPOSER;
+    return null;
   }
 
   private List<String> buildAvailableScripts(Path dir, JsonNode root, ProjectType type) {
@@ -204,81 +205,27 @@ public class PhpProjectScanner {
     if (type == ProjectType.SYMFONY) {
       scripts.add(PhpLaunchCommands.SYMFONY_SERVE);
     }
-    for (String key : extractComposerScripts(root)) {
+    for (String key : PhpComposerScripts.extractRuntimeScripts(root)) {
       if (!scripts.contains(key)) {
         scripts.add(key);
       }
     }
-    if ((type == ProjectType.PHP_COMPOSER || type == ProjectType.SYMFONY)
+    if (DockerComposeSupport.hasComposeFile(dir)
+        && !scripts.contains(PhpLaunchCommands.DOCKER_COMPOSE)) {
+      scripts.add(0, PhpLaunchCommands.DOCKER_COMPOSE);
+    }
+    if ((type == ProjectType.PHP_COMPOSER || type == ProjectType.SYMFONY || type == ProjectType.LARAVEL)
         && hasWebDocroot(dir)
         && !scripts.contains(PhpLaunchCommands.PHP_BUILTIN_SERVE)) {
-      scripts.add(0, PhpLaunchCommands.PHP_BUILTIN_SERVE);
+      scripts.add(PhpLaunchCommands.PHP_BUILTIN_SERVE);
     }
     return scripts;
   }
 
   private boolean hasWebDocroot(Path dir) {
-    return Files.isRegularFile(dir.resolve("public/index.php"))
+    return Files.isRegularFile(dir.resolve("index.php"))
+        || Files.isRegularFile(dir.resolve("public/index.php"))
         || Files.isDirectory(dir.resolve("public"));
-  }
-
-  private List<String> extractComposerScripts(JsonNode root) {
-    JsonNode scripts = root.path("scripts");
-    if (!scripts.isObject()) {
-      return List.of();
-    }
-    List<String> out = new ArrayList<>();
-    scripts.fieldNames().forEachRemaining(name -> {
-      if (isRuntimeScript(name, scripts.get(name))) {
-        out.add(name);
-      }
-    });
-    return out;
-  }
-
-  public static boolean isRuntimeComposerScriptName(String name) {
-    String lower = name.toLowerCase(Locale.ROOT);
-    if (NON_RUNTIME_SCRIPTS.contains(lower)) {
-      return false;
-    }
-    if (lower.startsWith("post-") || lower.startsWith("pre-")) {
-      return false;
-    }
-    if (lower.contains("analys") || lower.contains("stan") || lower.contains("lint")
-        || lower.contains("test") || lower.contains("format") || lower.contains("cs-fix")) {
-      return false;
-    }
-    return true;
-  }
-
-  private boolean isRuntimeScript(String name, JsonNode scriptNode) {
-    if (!isRuntimeComposerScriptName(name)) {
-      return false;
-    }
-    String body = scriptBody(scriptNode).toLowerCase(Locale.ROOT);
-    if (body.contains("phpstan") || body.contains("psalm") || body.contains("phpunit")
-        || body.contains("pest ") || body.contains("php-cs-fixer") || body.contains("rector")
-        || body.contains("deptrac") || body.contains("infection")) {
-      return false;
-    }
-    return true;
-  }
-
-  private String scriptBody(JsonNode scriptNode) {
-    if (scriptNode == null || scriptNode.isNull()) {
-      return "";
-    }
-    if (scriptNode.isTextual()) {
-      return scriptNode.asText("");
-    }
-    if (scriptNode.isArray()) {
-      StringBuilder sb = new StringBuilder();
-      for (JsonNode entry : scriptNode) {
-        sb.append(entry.asText("")).append(" ");
-      }
-      return sb.toString();
-    }
-    return scriptNode.toString();
   }
 
   private boolean hasPackage(JsonNode root, String pkg) {
@@ -296,7 +243,13 @@ public class PhpProjectScanner {
     return null;
   }
 
-  private Integer extractPort(Path dir, JsonNode root, String selectedScript, ProjectType type) {
+  private Integer extractPort(Path dir, String selectedScript, ProjectType type) {
+    if (PhpLaunchCommands.DOCKER_COMPOSE.equals(selectedScript)) {
+      Integer composePort = DockerComposeSupport.readPublishedHttpPort(dir);
+      if (composePort != null) {
+        return composePort;
+      }
+    }
     if (PhpLaunchCommands.ARTISAN_SERVE.equals(selectedScript)
         || PhpLaunchCommands.SYMFONY_SERVE.equals(selectedScript)
         || PhpLaunchCommands.PHP_BUILTIN_SERVE.equals(selectedScript)) {

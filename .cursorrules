@@ -44,14 +44,25 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 | JsProjectScanner | Walk dirs, find package.json; ignora subárvores PHP; Angular/React/Vue/Next/Nest | core.runtime.discovery.js |
 | StandaloneJsScanner | HTML sem package.json (`STATIC_HTML`); `.js` avulso (`STANDALONE_JS`) | core.runtime.discovery.js |
 | JsLaunchCommands | `npm run`, `npx serve`, `node file.js`; portas e `applySelection` | core.runtime.discovery.js |
-| PhpProjectScanner | `composer.json`; Laravel/Symfony/Composer; ignora dirs com `pom.xml` | core.runtime.discovery.php |
+| PhpProjectScanner | `composer.json`; Laravel/Symfony/PHP_COMPOSER; legado com `index.php` na raiz | core.runtime.discovery.php |
 | StandalonePhpScanner | `index.php` sem manifest (`STANDALONE_PHP`) | core.runtime.discovery.php |
-| PhpLaunchCommands | `artisan serve`, `composer run`, `symfony server`, `php -S` | core.runtime.discovery.php |
+| PhpLaunchCommands | `artisan serve`, `composer run`, `symfony server`, `php -S`, `docker compose up` | core.runtime.discovery.php |
+| PhpComposerScripts | Filtra scripts Composer de runtime vs QA | core.runtime.discovery.php |
+| DockerComposeSupport | Detecta compose e porta HTTP publicada | core.runtime.discovery.php |
 | PhpVersionDetector | PHP no PATH, Homebrew, phpenv | process |
 | PortExtractor | Read port from application.properties/yml | core.runtime.discovery.java |
 | ExternalToolLauncher | Open folder/terminal/editor | core.runtime.tools |
+| DockerManager | Fachada IPC do Docker real (status, inventário, remoção, prune) | core.runtime.docker |
+| DockerCli | Resolve `docker`/`colima` fora do PATH do shell; exec com timeout | core.runtime.docker |
+| DockerEngineProbe | Status do engine, detecção do Colima, recuperação de contexto | core.runtime.docker |
+| DockerEngineLauncher | Start assíncrono do daemon com stream de saída | core.runtime.docker |
+| DockerInventoryReader | containers/imagens/volumes/`system df` + marcação de uso | core.runtime.docker |
+| DockerResourceActions | Lifecycle, remoção em lote ordenada, prune por escopo | core.runtime.docker |
 | StateStore | JSON read/write to files | core.runtime.workspace |
 | ProcessManager | Process start/stop/kill, alive check | process |
+| ListeningPortScanner | Portas TCP em LISTEN (lsof/netstat) + processo dono | process |
+| DevPortHeuristics | Faixa dev (3000–9999 + comuns) e origem (cursor/vscode/ide/terminal/docker/runtime) | process |
+| ProcessSnapshot | Mapa pid → comando/ancestrais via ProcessHandle | process |
 | JavaVersionDetector | JDKs: SDKMAN, Homebrew, Program Files (Windows), macOS JVMs, JAVA_HOME | process |
 
 ### Models
@@ -61,7 +72,10 @@ Event:    `{"event":"eventName","payload":{...}}` (emitted as core_event to UI)
 | ServiceDefinition | Lombok @Data | model | Persisted service config |
 | ServiceView | Record | model | Read model / IPC DTO |
 | ServiceDescriptor | Lombok @Data | model | Definition + runtime pair (in-memory) |
-| Container | Lombok @Data | model | Logical service group |
+| Container | Lombok @Data | model | Logical service group (NOT Docker) |
+| DockerEngineStatus | Record | model.docker | Estado do daemon/CLI/Colima + comando de start |
+| DockerInventory | Record | model.docker | containers + imagens + volumes + disk usage |
+| DockerOperationResult | Record | model.docker | Resultado por item em lote (`ok` + mensagem) |
 
 ### IPC Methods (CoreRuntime.handle)
 Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `docs/integration/INTEGRATION.md`. Key groups:
@@ -73,12 +87,14 @@ Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `d
 - java: listJdks, getActiveJavaInfo, setServiceJavaVersion, setServiceMvnWrapper, rebuildServices
 - php: listPhpRuntimes, getActivePhpInfo, setServicePhpVersion
 - js/spring config: setServiceScript, setServicePort, resetServicePort
-- ports: checkPortFree, killPort
+- ports: checkPortFree, killPort, listListeningPorts
+- docker: dockerGetStatus, dockerStartEngine, dockerSetStartCommand, dockerListResources, dockerStart/Stop/RestartContainer, dockerRemoveResources, dockerPrune
 
 ### Persistence
 - `workspace.json` — roots, services, containers, removedServices (exclusion set)
 - `runtime.json` — per-service runtime state (pid, status, timestamps)
-- Both in `--stateDir` directory
+- `docker.json` — engineStartCommand (start do daemon/Colima)
+- All in `--stateDir` directory
 
 ### Critical Business Rules
 - Container deletion NEVER removes services — only clears containerIds
@@ -87,7 +103,12 @@ Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `d
 - Removed services tracked in `workspace.removedServices`; excluded from scan
 - importRootAndScan clears removedServices when adding a new root
 - importRootsAndScan: folders with pom.xml added as direct services, others as roots
+- importRootsAndScan com `containerId`: vincula ao container todos os serviços sob as pastas (já lidos ou novos)
 - Service removal clears containerIds before removing
+- Docker: `Result.succeeded()` (não só exit code) decide falha — `docker rm --force` sai 0 mesmo com "Error response from daemon"
+- Docker: remoção em lote ordena containers → imagens → volumes; inverter falha em recurso em uso
+- Docker: engine parado devolve `DockerInventory.unavailable(message)`, nunca exceção
+- Docker: `DockerCli` procura binários fora do PATH do shell (app aberto pelo Finder tem PATH reduzido) e fixa o `--context` que responde
 - Ports auto-detected from application.properties/yml, fallback to hash-based
 - JS services keep `detectedPort` only for UI; only scripts com `portStrategy=CLI` aceitam `customPort`. `listServices` re-lê `package.json` para sincronizar scripts/porta/strategy
 
@@ -103,6 +124,7 @@ Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `d
 
 ### React Components
 Full map: `orchestrator-desktop/src/ui/README.md`. Main: App, Toolbar, ServiceTable, ContainersPanel, ContainerTabs, LogsPanel, MonitorPanel, SettingsPanel, ContextMenu, KillPortModal, ServicePortModal. Hooks: useCoreEvents, useServiceBranchPolling, useJavaRuntime, useServiceShortcuts, useDragReorder.
+Seção Docker isolada em `src/ui/docker/` (DockerView + tabelas de containers/imagens/volumes, useDockerData, useDockerActions); `Toolbar` alterna `AppSection` e a view de serviços fica montada/oculta para preservar assinaturas de log.
 
 ### API Client (api/client.ts)
 - `core()` serializa chamadas a `invoke("core_request")` numa fila (evita vários IPC em paralelo no Windows)

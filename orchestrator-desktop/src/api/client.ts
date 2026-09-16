@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ActiveJavaInfoDto, ContainerDto, JdkInfo, PhpInfo, RuntimeSettingsDto, ServiceBranchMapDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
+import type { ActiveJavaInfoDto, ContainerDto, DockerEngineStatusDto, DockerInventoryDto, DockerOperationResultDto, DockerPruneScope, DockerResourceTarget, JdkInfo, ListeningPortDto, PhpInfo, RuntimeSettingsDto, ServiceBranchMapDto, ServiceDto, StopResultDto, WorkspaceDto } from "./types";
 
 type CoreJob<T> = () => Promise<T>;
 
 let coreRequestTail: Promise<unknown> = Promise.resolve();
 const CORE_REQUEST_TIMEOUT_MS = 45_000;
+const DOCKER_SLOW_TIMEOUT_MS = 330_000;
 
 function enqueueCoreRequest<T>(job: CoreJob<T>): Promise<T> {
   const run = coreRequestTail.then(() => job());
@@ -15,7 +16,7 @@ function enqueueCoreRequest<T>(job: CoreJob<T>): Promise<T> {
   return run;
 }
 
-async function core<T>(method: string, params: unknown = {}): Promise<T> {
+async function core<T>(method: string, params: unknown = {}, timeoutMs = CORE_REQUEST_TIMEOUT_MS): Promise<T> {
   return enqueueCoreRequest(async () => {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
@@ -23,8 +24,8 @@ async function core<T>(method: string, params: unknown = {}): Promise<T> {
         invoke<T>("core_request", { method, params }),
         new Promise<T>((_, reject) => {
           timeoutHandle = setTimeout(
-            () => reject(new Error(`Timeout de ${CORE_REQUEST_TIMEOUT_MS / 1000}s aguardando resposta do core (${method}).`)),
-            CORE_REQUEST_TIMEOUT_MS,
+            () => reject(new Error(`Timeout de ${timeoutMs / 1000}s aguardando resposta do core (${method}).`)),
+            timeoutMs,
           );
         }),
       ]);
@@ -41,7 +42,8 @@ async function core<T>(method: string, params: unknown = {}): Promise<T> {
 export const api = {
   getWorkspace: () => core<WorkspaceDto>("getWorkspace"),
   importRootAndScan: (root: string) => core<ServiceDto[]>("importRootAndScan", { root }),
-  importRootsAndScan: (roots: string[]) => core<ServiceDto[]>("importRootsAndScan", { roots }),
+  importRootsAndScan: (roots: string[], containerId?: string) =>
+    core<ServiceDto[]>("importRootsAndScan", containerId ? { roots, containerId } : { roots }),
   scanRoots: () => core<ServiceDto[]>("scanRoots"),
   listServices: () => core<ServiceDto[]>("listServices"),
   listServiceBranches: () => core<ServiceBranchMapDto>("listServiceBranches"),
@@ -63,6 +65,8 @@ export const api = {
   setJavaRuntimePath: (javaPath: string | null) => invoke<RuntimeSettingsDto>("set_java_runtime_path", { javaPath }),
 
   createContainer: (name: string, description?: string) => core<ContainerDto>("createContainer", { name, description }),
+  updateContainer: (id: string, name: string, description: string) =>
+    core<ContainerDto>("updateContainer", { id, name, description }),
   deleteContainer: (id: string) => core<ContainerDto>("deleteContainer", { id }),
   listContainers: () => core<ContainerDto[]>("listContainers"),
   addServiceToContainer: (serviceName: string, containerId: string) => core<ServiceDto[]>("addServiceToContainer", { name: serviceName, containerId }),
@@ -89,10 +93,24 @@ export const api = {
   setServicePort: (name: string, port: number) => core<ServiceDto[]>("setServicePort", { name, port }),
   resetServicePort: (name: string) => core<ServiceDto[]>("resetServicePort", { name }),
   checkPortFree: (port: number) => core<{ free: boolean }>("checkPortFree", { port }),
+  listListeningPorts: () => core<ListeningPortDto[]>("listListeningPorts"),
   killPort: (port: number) =>
     core<{ ok: boolean; killed: boolean; free: boolean; message: string }>("killPort", { port }),
 
   reorderServices: (order: string[]) => core<void>("reorderServices", { order }),
   reorderContainers: (order: string[]) => core<void>("reorderContainers", { order }),
+
+  dockerGetStatus: () => core<DockerEngineStatusDto>("dockerGetStatus"),
+  dockerStartEngine: (command?: string) =>
+    core<DockerEngineStatusDto>("dockerStartEngine", command ? { command } : {}),
+  dockerSetStartCommand: (command: string) => core<DockerEngineStatusDto>("dockerSetStartCommand", { command }),
+  dockerListResources: () => core<DockerInventoryDto>("dockerListResources", {}, 90_000),
+  dockerStartContainer: (id: string) => core<DockerOperationResultDto>("dockerStartContainer", { id }, 90_000),
+  dockerStopContainer: (id: string) => core<DockerOperationResultDto>("dockerStopContainer", { id }, 90_000),
+  dockerRestartContainer: (id: string) => core<DockerOperationResultDto>("dockerRestartContainer", { id }, 90_000),
+  dockerRemoveResources: (targets: DockerResourceTarget[], force = true) =>
+    core<DockerOperationResultDto[]>("dockerRemoveResources", { targets, force }, DOCKER_SLOW_TIMEOUT_MS),
+  dockerPrune: (scopes: DockerPruneScope[], removeUnusedImages = false) =>
+    core<DockerOperationResultDto[]>("dockerPrune", { scopes, removeUnusedImages }, DOCKER_SLOW_TIMEOUT_MS),
 };
 

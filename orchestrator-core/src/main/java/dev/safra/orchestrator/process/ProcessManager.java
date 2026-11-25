@@ -1,18 +1,16 @@
 package dev.safra.orchestrator.process;
-import java.io.File;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import dev.safra.orchestrator.model.ProjectType;
+import java.util.function.LongConsumer;
 import dev.safra.orchestrator.model.ServiceDefinition;
 
 public class ProcessManager {
@@ -20,11 +18,9 @@ public class ProcessManager {
   private final Duration killTimeout;
   private final JavaVersionDetector javaDetector = new JavaVersionDetector();
   private final PhpVersionDetector phpDetector = new PhpVersionDetector();
-  private final List<Integer> protectedPorts = parseProtectedPorts(System.getenv("ORCHESTRATOR_PROTECTED_PORTS"));
-
-  private enum RuntimeKind {
-    JAVA, PHP, JS
-  }
+  private final ProcessLaunchEnv launchEnv = new ProcessLaunchEnv(javaDetector, phpDetector);
+  private final List<Integer> protectedPorts = ProcessStartupPort.parseProtected(
+      System.getenv("ORCHESTRATOR_PROTECTED_PORTS"));
 
   public ProcessManager(Duration gracefulTimeout, Duration killTimeout) {
     this.gracefulTimeout = gracefulTimeout;
@@ -40,6 +36,14 @@ public class ProcessManager {
   }
 
   public long start(ServiceDefinition def) {
+    return start(def, null, null);
+  }
+
+  public long start(ServiceDefinition def, Long stalePid) {
+    return start(def, stalePid, null);
+  }
+
+  public long start(ServiceDefinition def, Long stalePid, LongConsumer onExit) {
     validateDefinition(def);
     try {
       Path workDir = Path.of(def.getPath()).toAbsolutePath().normalize();
@@ -50,78 +54,30 @@ public class ProcessManager {
       }
 
       List<String> cmd = new ArrayList<>(def.getCommand());
-      RuntimeKind kind = resolveRuntimeKind(def.getProjectType());
-      boolean isJava = kind == RuntimeKind.JAVA;
-      Integer startupPort = resolveStartupPort(def, isJava);
-      Map<String, String> startupEnv = buildStartupEnv(def, isJava, startupPort);
+      ProcessRuntimeKind kind = ProcessRuntimeKind.of(def.getProjectType());
+      boolean isJava = kind == ProcessRuntimeKind.JAVA;
+      Integer startupPort = ProcessStartupPort.resolve(def, isJava);
+      Map<String, String> startupEnv = ProcessStartupPort.buildEnv(def, isJava, startupPort);
 
-      validateStartupPort(def, startupPort);
-      freePort(startupPort);
+      ProcessStartupPort.validate(def, startupPort, protectedPorts);
+      ProcessStartupPort.ensureFree(startupPort, stalePid);
 
-      if (isJava) {
-        cmd = MavenLaunchCommands.normalizeWindowsMvnw(cmd, workDir);
-        cmd = MavenLaunchCommands.wrapWindowsMvn(cmd);
-      }
-
-      if (!cmd.isEmpty() && workDir.resolve("mvnw").toFile().exists()) {
-        try {
-          workDir.resolve("mvnw").toFile().setExecutable(true);
-        } catch (Exception ignored) {
-        }
-      }
-
-      if (!isJava) {
-        cmd = applyCustomShellPort(def, cmd, startupPort);
-        String joined = String.join(" ", cmd);
-        if (isWindows()) {
-          cmd = List.of("cmd.exe", "/d", "/s", "/c", "chcp 65001>nul && " + joined);
-        } else {
-          String shell = System.getenv("SHELL");
-          if (shell == null || shell.isBlank()) shell = "/bin/zsh";
-          cmd = wrapUnixSession(List.of(shell, "-lc", joined));
-        }
-      }
+      cmd = ProcessCommandBuilder.prepare(def, cmd, workDir, kind, startupPort);
 
       ProcessBuilder pb = new ProcessBuilder(cmd);
       pb.directory(workDir.toFile());
       pb.redirectErrorStream(true);
       pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logPath.toFile()));
 
-      Map<String, String> env = pb.environment();
-      env.putAll(startupEnv);
-
-      String path = env.getOrDefault("PATH", "");
-
-      if (isJava) {
-        path = setupJavaPath(def, env, path);
-      } else {
-        if (kind == RuntimeKind.PHP) {
-          path = setupPhpPath(def, env, path);
-        }
-        path = setupNodePath(env, path, workDir);
-      }
-
-      applyUtf8Env(env, isJava);
-
-      for (String extra : new String[]{"/opt/homebrew/bin", "/usr/local/bin"}) {
-        if (!path.contains(extra) && Files.isDirectory(Path.of(extra))) path = prependPath(path, extra);
-      }
-      env.put("PATH", path);
-
-      try {
-        if (!Files.exists(logPath)) Files.createFile(logPath);
-        String info = isJava
-            ? "[orchestrator] Iniciando com JAVA_HOME=" + env.getOrDefault("JAVA_HOME", "system")
-            : "[orchestrator] Iniciando projeto " + def.getProjectType();
-        Files.writeString(logPath, info + "\n",
-            StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception ignored) {
-      }
+      launchEnv.apply(pb.environment(), def, kind, workDir, startupEnv);
+      appendStartupNote(logPath, def, pb.environment(), isJava);
 
       Process p = pb.start();
       long pid = p.pid();
 
-      monitorProcess(pid, def.getName());
+      if (onExit != null) {
+        ProcessHandle.of(pid).ifPresent(handle -> handle.onExit().thenRun(() -> onExit.accept(pid)));
+      }
 
       return pid;
     } catch (IOException e) {
@@ -144,7 +100,7 @@ public class ProcessManager {
       return StopResult.alreadyStopped(pid);
     }
 
-    if (isWindows()) {
+    if (ProcessOs.isWindows()) {
       killWindowsTree(pid);
       boolean exited = waitForExit(h, gracefulTimeout);
       if (exited && !ProcessTreeKiller.anyAlive(pid)) {
@@ -152,7 +108,7 @@ public class ProcessManager {
       }
     }
 
-    boolean isolated = !isWindows() && ProcessTreeKiller.isIsolatedFromSelf(pid);
+    boolean isolated = !ProcessOs.isWindows() && ProcessTreeKiller.isIsolatedFromSelf(pid);
     if (isolated) {
       ProcessTreeKiller.terminateGracefully(pid);
       boolean exited = waitForExit(h, gracefulTimeout);
@@ -170,37 +126,6 @@ public class ProcessManager {
       return StopResult.stopped(pid, "SIGKILL");
     }
     return StopResult.failed(pid, "Não foi possível finalizar o processo (TERM+KILL) dentro do timeout.");
-  }
-
-  private List<String> wrapUnixSession(List<String> command) {
-    String python = resolvePython3();
-    if (python == null) {
-      return command;
-    }
-    List<String> wrapped = new ArrayList<>();
-    wrapped.add(python);
-    wrapped.add("-c");
-    wrapped.add("import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])");
-    wrapped.addAll(command);
-    return wrapped;
-  }
-
-  private String resolvePython3() {
-    for (String candidate : List.of("/opt/homebrew/bin/python3", "/usr/bin/python3", "python3")) {
-      try {
-        Path path = Path.of(candidate);
-        if (candidate.equals("python3") || Files.isExecutable(path)) {
-          Process probe = new ProcessBuilder(candidate, "-c", "import os; assert hasattr(os,'setsid')")
-              .redirectErrorStream(true)
-              .start();
-          if (probe.waitFor(3, TimeUnit.SECONDS) && probe.exitValue() == 0) {
-            return candidate;
-          }
-        }
-      } catch (Exception ignored) {
-      }
-    }
-    return null;
   }
 
   private void killWindowsTree(long pid) {
@@ -236,315 +161,17 @@ public class ProcessManager {
     }
   }
 
-  private String detectJavaHome(String requiredVersion) {
-    return javaDetector.resolveJavaHome(requiredVersion);
-  }
-
-  private String setupJavaPath(ServiceDefinition def, Map<String, String> env, String path) {
-    env.remove("JAVA_HOME");
-    String javaHome = def.getJavaHome();
-    if (javaHome == null || javaHome.isBlank()) {
-      javaHome = detectJavaHome(def.getJavaVersion());
-    }
-    if (javaHome != null && !javaHome.isBlank()) {
-      env.put("JAVA_HOME", javaHome);
-      path = prependPath(path, Path.of(javaHome, "bin").toString());
-    }
-    path = setupMavenPath(env, path);
-    String home = System.getProperty("user.home");
-    String sdkmanMvn = home + "/.sdkman/candidates/maven/current/bin";
-    if (Files.isDirectory(Path.of(sdkmanMvn))) path = prependPath(path, sdkmanMvn);
-    return path;
-  }
-
-  private String setupMavenPath(Map<String, String> env, String path) {
-    String mvnHome = env.get("MAVEN_HOME");
-    if (mvnHome != null && !mvnHome.isBlank()) {
-      Path mvnBin = Path.of(mvnHome, "bin");
-      if (Files.isDirectory(mvnBin)) {
-        path = prependPath(path, mvnBin.toString());
+  private void appendStartupNote(Path logPath, ServiceDefinition def, Map<String, String> env, boolean isJava) {
+    try {
+      if (!Files.exists(logPath)) {
+        Files.createFile(logPath);
       }
-    }
-
-    String localAppData = env.getOrDefault("LOCALAPPDATA", System.getenv("LOCALAPPDATA"));
-    if (localAppData == null || localAppData.isBlank()) {
-      return path;
-    }
-    Path depsRoot = Path.of(localAppData, "OrchestratorBuildDeps");
-    if (!Files.isDirectory(depsRoot)) {
-      return path;
-    }
-    try (var dirs = Files.list(depsRoot)) {
-      Optional<Path> latestMaven = dirs
-          .filter(Files::isDirectory)
-          .filter(p -> p.getFileName().toString().startsWith("apache-maven-"))
-          .filter(p -> Files.exists(p.resolve("bin").resolve(isWindows() ? "mvn.cmd" : "mvn")))
-          .max(Comparator.comparingLong(p -> p.toFile().lastModified()));
-      if (latestMaven.isPresent()) {
-        Path home = latestMaven.get();
-        env.putIfAbsent("MAVEN_HOME", home.toString());
-        path = prependPath(path, home.resolve("bin").toString());
-      }
+      String info = isJava
+          ? "[orchestrator] Iniciando com JAVA_HOME=" + env.getOrDefault("JAVA_HOME", "system")
+          : "[orchestrator] Iniciando projeto " + def.getProjectType();
+      Files.writeString(logPath, info + "\n",
+          StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
     } catch (Exception ignored) {
     }
-    return path;
-  }
-
-  private String setupNodePath(Map<String, String> env, String path, Path workDir) {
-    String localBin = workDir.resolve("node_modules/.bin").toAbsolutePath().toString();
-    path = prependPath(path, localBin);
-
-    String shellPath = resolveShellPath();
-    if (!shellPath.isEmpty()) path = prependPath(path, shellPath);
-
-    String home = System.getProperty("user.home");
-    String[] nodePaths = {
-        home + "/.nvm/versions/node",
-        home + "/.volta/bin",
-        home + "/.fnm/aliases/default/bin"
-    };
-    for (String dir : nodePaths) {
-      Path p = Path.of(dir);
-      if (!Files.isDirectory(p)) continue;
-      if (dir.endsWith("/node")) {
-        try (var stream = Files.list(p)) {
-          var latest = stream.filter(Files::isDirectory).max(java.util.Comparator.naturalOrder());
-          if (latest.isPresent()) {
-            String bin = latest.get().resolve("bin").toString();
-            if (!path.contains(bin)) path = prependPath(path, bin);
-          }
-        } catch (Exception ignored) {}
-      } else {
-        if (!path.contains(dir)) path = prependPath(path, dir);
-      }
-    }
-    return path;
-  }
-
-  private String resolveShellPath() {
-    try {
-      if (isWindows()) {
-        Process p = new ProcessBuilder("cmd.exe", "/c", "echo %PATH%")
-            .redirectErrorStream(true).start();
-        String out = new String(p.getInputStream().readAllBytes()).trim();
-        p.waitFor(5, TimeUnit.SECONDS);
-        return out;
-      }
-      String shell = System.getenv("SHELL");
-      if (shell == null || shell.isBlank()) shell = "/bin/zsh";
-      Process p = new ProcessBuilder(shell, "-lc", "echo $PATH")
-          .redirectErrorStream(true).start();
-      String out = new String(p.getInputStream().readAllBytes()).trim();
-      p.waitFor(5, TimeUnit.SECONDS);
-      return out;
-    } catch (Exception ignored) {
-      return "";
-    }
-  }
-
-  private boolean isWindows() {
-    return System.getProperty("os.name").toLowerCase().contains("win");
-  }
-
-  private String prependPath(String path, String entry) {
-    if (entry == null || entry.isBlank()) return path;
-    if (path == null || path.isBlank()) return entry;
-    return entry + File.pathSeparator + path;
-  }
-
-  private Integer resolveStartupPort(ServiceDefinition def, boolean isJava) {
-    if (!isJava && !"CLI".equalsIgnoreCase(def.getPortStrategy()) && !"ENV".equalsIgnoreCase(def.getPortStrategy())) {
-      return null;
-    }
-    if (!isJava && def.getCustomPort() != null) {
-      return def.getCustomPort();
-    }
-    if (def.getDetectedPort() != null) {
-      return def.getDetectedPort();
-    }
-    if (def.getEnv() == null) {
-      return null;
-    }
-    String port = def.getEnv().getOrDefault("SERVER_PORT", def.getEnv().get("PORT"));
-    if (port == null || port.isBlank()) {
-      return null;
-    }
-    try {
-      return Integer.parseInt(port.trim());
-    } catch (NumberFormatException ignored) {
-      return null;
-    }
-  }
-
-  private Map<String, String> buildStartupEnv(ServiceDefinition def, boolean isJava, Integer startupPort) {
-    Map<String, String> env = new HashMap<>();
-    if (def.getEnv() != null) {
-      env.putAll(def.getEnv());
-    }
-    if (!isJava) {
-      env.remove("SERVER_PORT");
-      env.remove("PORT");
-      if (def.getCustomPort() != null && startupPort != null && "ENV".equalsIgnoreCase(def.getPortStrategy())) {
-        String port = String.valueOf(startupPort);
-        env.put("SERVER_PORT", port);
-        env.put("PORT", port);
-      }
-    }
-    return env;
-  }
-
-  private RuntimeKind resolveRuntimeKind(ProjectType type) {
-    if (type == null || type == ProjectType.SPRING_BOOT) {
-      return RuntimeKind.JAVA;
-    }
-    if (type == ProjectType.LARAVEL || type == ProjectType.SYMFONY
-        || type == ProjectType.PHP_COMPOSER || type == ProjectType.STANDALONE_PHP) {
-      return RuntimeKind.PHP;
-    }
-    return RuntimeKind.JS;
-  }
-
-  private String setupPhpPath(ServiceDefinition def, Map<String, String> env, String path) {
-    String phpBinary = def.getPhpHome();
-    if (phpBinary == null || phpBinary.isBlank()) {
-      phpBinary = phpDetector.resolvePhpBinary(def.getPhpVersion());
-    }
-    if (phpBinary != null && !phpBinary.isBlank()) {
-      Path bin = Path.of(phpBinary);
-      if (Files.isRegularFile(bin)) {
-        path = prependPath(path, bin.getParent().toString());
-      } else if (Files.isDirectory(bin)) {
-        path = prependPath(path, bin.resolve("bin").toString());
-      }
-    }
-    String composerHome = System.getProperty("user.home") + "/.composer/vendor/bin";
-    if (Files.isDirectory(Path.of(composerHome))) {
-      path = prependPath(path, composerHome);
-    }
-    return path;
-  }
-
-  private List<String> applyCustomShellPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
-    List<String> updated = applyCustomJsPort(def, cmd, startupPort);
-    return applyPhpBuiltinPort(def, updated, startupPort);
-  }
-
-  private List<String> applyPhpBuiltinPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
-    if (startupPort == null || def.getCustomPort() == null || !"CLI".equalsIgnoreCase(def.getPortStrategy())) {
-      return cmd;
-    }
-    List<String> updated = new ArrayList<>(cmd);
-    String value = "localhost:" + startupPort;
-    for (int i = 0; i < updated.size(); i++) {
-      String token = updated.get(i);
-      if (token.startsWith("127.0.0.1:") || token.startsWith("localhost:")) {
-        int colon = token.indexOf(':');
-        updated.set(i, token.substring(0, colon + 1) + startupPort);
-        return updated;
-      }
-      if ("-S".equals(token) && i + 1 < updated.size()) {
-        String next = updated.get(i + 1);
-        if (next.startsWith("127.0.0.1:") || next.startsWith("localhost:")) {
-          updated.set(i + 1, value);
-          return updated;
-        }
-      }
-    }
-    return updated;
-  }
-
-  private List<String> applyCustomJsPort(ServiceDefinition def, List<String> cmd, Integer startupPort) {
-    if (startupPort == null || def.getCustomPort() == null || !"CLI".equalsIgnoreCase(def.getPortStrategy())) {
-      return cmd;
-    }
-    List<String> updated = new ArrayList<>(cmd);
-    String value = String.valueOf(startupPort);
-    boolean changed = false;
-    for (int i = 0; i < updated.size(); i++) {
-      String token = updated.get(i);
-      if ("--port".equalsIgnoreCase(token) || "-p".equalsIgnoreCase(token)) {
-        if (i + 1 < updated.size()) {
-          updated.set(i + 1, value);
-          changed = true;
-        }
-      } else if (token.startsWith("--port=")) {
-        updated.set(i, "--port=" + value);
-        changed = true;
-      } else if (token.startsWith("--PORT=")) {
-        updated.set(i, "--PORT=" + value);
-        changed = true;
-      } else if ("-l".equals(token) && i + 1 < updated.size()) {
-        updated.set(i + 1, value);
-        changed = true;
-      } else if (token.startsWith("-l=")) {
-        updated.set(i, "-l=" + value);
-        changed = true;
-      }
-    }
-    if (!changed && updated.size() >= 2 && "npm".equalsIgnoreCase(updated.get(0)) && "run".equalsIgnoreCase(updated.get(1))) {
-      updated.add("--");
-      updated.add("--port");
-      updated.add(value);
-      updated.add("--strictPort");
-    }
-    return updated;
-  }
-
-  private void applyUtf8Env(Map<String, String> env, boolean isJava) {
-    env.put("LANG", "en_US.UTF-8");
-    env.put("LC_ALL", "en_US.UTF-8");
-    env.put("PYTHONIOENCODING", "utf-8");
-    if (!isJava) {
-      return;
-    }
-    String utf8Flags = "-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8";
-    env.merge("JAVA_TOOL_OPTIONS", utf8Flags, (current, extra) -> current.contains(extra) ? current : current + " " + extra);
-    env.merge("MAVEN_OPTS", utf8Flags, (current, extra) -> current.contains(extra) ? current : current + " " + extra);
-  }
-
-  private void freePort(Integer port) {
-    if (port == null) {
-      return;
-    }
-    Map<String, String> env = Map.of("SERVER_PORT", String.valueOf(port));
-    PortProcessKiller.freePort(env, isWindows());
-  }
-
-  private void validateStartupPort(ServiceDefinition def, Integer port) {
-    if (port == null || !protectedPorts.contains(port)) {
-      return;
-    }
-    throw new IllegalStateException("Porta " + port
-        + " está reservada pelo Orchestrator em modo desenvolvimento. Configure outra porta para o serviço "
-        + def.getName() + ".");
-  }
-
-  private static List<Integer> parseProtectedPorts(String raw) {
-    if (raw == null || raw.isBlank()) {
-      return List.of();
-    }
-    List<Integer> ports = new ArrayList<>();
-    for (String part : raw.split(",")) {
-      try {
-        ports.add(Integer.parseInt(part.trim()));
-      } catch (NumberFormatException ignored) {
-      }
-    }
-    return ports;
-  }
-
-  private void monitorProcess(long pid, String serviceName) {
-    Thread t = new Thread(() -> {
-      try {
-        Optional<ProcessHandle> opt = ProcessHandle.of(pid);
-        if (opt.isEmpty())
-          return;
-        opt.get().onExit().thenRun(() -> {
-        });
-      } catch (Exception ignored) {
-      }
-    }, "monitor-" + serviceName);
-    t.setDaemon(true);
-    t.start();
   }
 }

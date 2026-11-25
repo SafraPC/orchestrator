@@ -1,0 +1,16 @@
+# process — OS/process infrastructure
+
+`ProcessManager` is the public façade for start/stop/alive. Launch details stay in package-private helpers.
+
+| Class | Responsibility |
+| --- | --- |
+| ProcessManager | Start/stop; `onExit` callback when the OS process dies |
+| ProcessCommandBuilder | Shell wrap, JS/PHP port injection |
+| ProcessLaunchEnv | PATH, JAVA_HOME, Maven/Node/PHP, UTF-8 |
+| ProcessStartupPort | Detected/custom port, env, protected ports |
+| ProcessRuntimeKind | JAVA / PHP / JS |
+| ProcessOs | Windows check, PATH prepend |
+| ProcessTreeKiller / PortProcessKiller | Tree kill and port free |
+| ListeningPortScanner / DevPortHeuristics / ProcessSnapshot | LISTEN inventory |
+| JavaVersionDetector / PhpVersionDetector | Runtime discovery |
+| MavenLaunchCommands / WindowsCommandResolver | Launch command shape |

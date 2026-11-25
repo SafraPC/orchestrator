@@ -2,12 +2,7 @@ package dev.safra.orchestrator.core.runtime.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.safra.orchestrator.core.runtime.discovery.js.JsLaunchCommands;
-import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
 import dev.safra.orchestrator.core.runtime.logs.LogManager;
-import dev.safra.orchestrator.core.runtime.workspace.WorkspaceDefinitionSync;
-import dev.safra.orchestrator.model.ProjectType;
-import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.model.ServiceRuntime;
 import dev.safra.orchestrator.model.ServiceStatus;
@@ -15,8 +10,6 @@ import dev.safra.orchestrator.model.ServiceView;
 import dev.safra.orchestrator.model.Workspace;
 import dev.safra.orchestrator.process.ProcessManager;
 import dev.safra.orchestrator.process.StopResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,6 +28,7 @@ public class ServiceManager {
   private final Runnable persistRuntime;
   private final Runnable persistWorkspace;
   private final Supplier<Workspace> workspaceSupplier;
+  private final ServiceBatchOps batchOps;
 
   public ServiceManager(ObjectMapper om, ProcessManager processManager, LogManager logManager,
       BiConsumer<String, JsonNode> emitEvent, Map<String, ServiceDescriptor> services,
@@ -47,6 +41,7 @@ public class ServiceManager {
     this.persistRuntime = persistRuntime;
     this.persistWorkspace = persistWorkspace;
     this.workspaceSupplier = workspaceSupplier;
+    this.batchOps = new ServiceBatchOps(this, om, services, workspaceSupplier, emitEvent);
   }
 
   public JsonNode list() {
@@ -56,35 +51,15 @@ public class ServiceManager {
   public JsonNode start(String name) {
     ServiceDescriptor sd = requireService(name);
     ServiceRuntime rt = sd.getRuntime();
-    ServiceDefinition def = sd.getDefinition();
-    if (def.getProjectType() != null && def.getProjectType() != ProjectType.SPRING_BOOT
-        && JsLaunchCommands.usesNpmRun(def.getProjectType())
-        && def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-      String selected = WorkspaceDefinitionSync.selectRuntimeJsScript(def.getSelectedScript(),
-          def.getAvailableScripts());
-      if (selected != null && (def.getSelectedScript() == null || !def.getSelectedScript().equals(selected)
-          || def.getCommand() == null || def.getCommand().isEmpty())) {
-        def.setSelectedScript(selected);
-        def.setCommand(JsLaunchCommands.npmRunCommand(selected));
-        persistWorkspace.run();
-      }
-    }
-    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
-      validatePhpProject(def);
-      if (def.getAvailableScripts() != null && !def.getAvailableScripts().isEmpty()) {
-        String selected = WorkspaceDefinitionSync.selectRuntimePhpScript(def.getSelectedScript(),
-            def.getAvailableScripts());
-        if (selected != null) {
-          PhpLaunchCommands.applySelection(def, selected);
-          persistWorkspace.run();
-        }
-      }
-    }
+    ServiceLaunchPrep.prepare(sd.getDefinition(), persistWorkspace);
+
+    Long stalePid = null;
 
     if (rt.getPid() != null) {
       if (processManager.isAlive(rt.getPid())) {
         return om.valueToTree(toView(sd));
       }
+      stalePid = rt.getPid();
       rt.setPid(null);
       rt.setStatus(ServiceStatus.STOPPED);
     }
@@ -92,7 +67,9 @@ public class ServiceManager {
     logManager.emitLogStatus(name, "Iniciando serviço " + name + "...");
 
     try {
-      long pid = processManager.start(sd.getDefinition());
+      long pid = processManager.start(sd.getDefinition(), stalePid, exitedPid ->
+          ServiceHealthCheck.onProcessExit(
+              name, exitedPid, sd, logManager, persistRuntime, services, emitEvent, om));
       rt.setPid(pid);
       rt.setStatus(ServiceStatus.RUNNING);
       rt.setLastStartAt(Instant.now());
@@ -101,8 +78,6 @@ public class ServiceManager {
       logManager.emitLogStatus(name, "Processo iniciado com PID: " + pid);
       persistRuntime.run();
       emitServiceChanged(name);
-
-      scheduleHealthCheck(name, pid, sd);
 
       return om.valueToTree(toView(sd));
     } catch (Exception e) {
@@ -138,37 +113,43 @@ public class ServiceManager {
   }
 
   public JsonNode restart(String name) {
+    ServiceDescriptor sd = requireService(name);
+    Long pid = sd.getRuntime().getPid();
     stop(name);
+
+    if (pid != null && processManager.isAlive(pid)) {
+      processManager.stop(pid);
+      sd.getRuntime().setPid(null);
+      sd.getRuntime().setStatus(ServiceStatus.STOPPED);
+      persistRuntime.run();
+    }
+
     return start(name);
   }
 
   public JsonNode startAll() {
-    List<ServiceView> out = new ArrayList<>();
-    for (ServiceDescriptor sd : new ArrayList<>(services.values())) {
-      try {
-        JsonNode started = start(sd.getDefinition().getName());
-        out.add(om.treeToValue(started, ServiceView.class));
-      } catch (Exception e) {
-        out.add(toView(sd));
-      }
-    }
-    return om.valueToTree(out);
+    return batchOps.startAll();
   }
 
   public JsonNode stopAll() {
-    List<StopResult> out = new ArrayList<>();
-    for (ServiceDescriptor sd : new ArrayList<>(services.values())) {
-      try {
-        JsonNode stopped = stop(sd.getDefinition().getName());
-        out.add(om.treeToValue(stopped, StopResult.class));
-      } catch (Exception e) {
-        out.add(StopResult.failed(
-            sd.getRuntime().getPid() != null ? sd.getRuntime().getPid() : 0,
-            "Erro ao parar: " + e.getMessage()));
+    return batchOps.stopAll();
+  }
+
+  public void stopLeftoverProcesses() {
+    for (ServiceDescriptor sd : services.values()) {
+      Long pid = sd.getRuntime().getPid();
+
+      if (pid == null) {
+        continue;
       }
+
+      processManager.stop(pid);
+      ServiceRuntime rt = sd.getRuntime();
+      rt.setPid(null);
+      rt.setStatus(ServiceStatus.STOPPED);
     }
-    emitServicesChanged();
-    return om.valueToTree(out);
+
+    persistRuntime.run();
   }
 
   public JsonNode remove(String name) {
@@ -200,71 +181,26 @@ public class ServiceManager {
   }
 
   public JsonNode startByContainer(String containerId) {
-    List<ServiceView> out = new ArrayList<>();
-    List<ServiceDescriptor> toStart = services.values().stream()
-        .filter(sd -> hasContainer(sd, containerId))
-        .toList();
-
-    for (ServiceDescriptor sd : toStart) {
-      try {
-        JsonNode started = start(sd.getDefinition().getName());
-        out.add(om.treeToValue(started, ServiceView.class));
-      } catch (Exception e) {
-        out.add(toView(sd));
-      }
-    }
-    return om.valueToTree(out);
+    return batchOps.startByContainer(containerId);
   }
 
   public JsonNode stopByContainer(String containerId) {
-    List<StopResult> out = new ArrayList<>();
-    List<ServiceDescriptor> toStop = services.values().stream()
-        .filter(sd -> hasContainer(sd, containerId))
-        .toList();
-
-    for (ServiceDescriptor sd : toStop) {
-      try {
-        JsonNode stopped = stop(sd.getDefinition().getName());
-        out.add(om.treeToValue(stopped, StopResult.class));
-      } catch (Exception e) {
-        out.add(StopResult.failed(
-            sd.getRuntime().getPid() != null ? sd.getRuntime().getPid() : 0,
-            "Erro ao parar: " + e.getMessage()));
-      }
-    }
-    emitServicesChanged();
-    return om.valueToTree(out);
+    return batchOps.stopByContainer(containerId);
   }
 
   public JsonNode restartByContainer(String containerId) {
-    List<ServiceView> out = new ArrayList<>();
-    List<ServiceDescriptor> toRestart = services.values().stream()
-        .filter(sd -> hasContainer(sd, containerId))
-        .toList();
-
-    for (ServiceDescriptor sd : toRestart) {
-      try {
-        JsonNode restarted = restart(sd.getDefinition().getName());
-        out.add(om.treeToValue(restarted, ServiceView.class));
-      } catch (Exception e) {
-        out.add(toView(sd));
-      }
-    }
-    emitServicesChanged();
-    return om.valueToTree(out);
+    return batchOps.restartByContainer(containerId);
   }
 
   public JsonNode getByContainer(String containerId) {
-    return om.valueToTree(sortedViews(services.values().stream()
-        .filter(sd -> hasContainer(sd, containerId))
-        .map(this::toView)
-        .toList()));
+    return batchOps.getByContainer(containerId);
   }
 
   public ServiceDescriptor requireService(String name) {
     ServiceDescriptor sd = services.get(name);
-    if (sd == null)
+    if (sd == null) {
       throw new IllegalArgumentException("Serviço não encontrado: " + name);
+    }
     return sd;
   }
 
@@ -289,11 +225,6 @@ public class ServiceManager {
     return ServiceViewMapper.fromDescriptor(sd);
   }
 
-  private boolean hasContainer(ServiceDescriptor sd, String containerId) {
-    ServiceDefinition def = sd.getDefinition();
-    return def.getContainerIds() != null && def.getContainerIds().contains(containerId);
-  }
-
   private void detachService(String name) {
     ServiceDescriptor sd = services.remove(name);
     if (sd == null) {
@@ -311,8 +242,9 @@ public class ServiceManager {
 
   private void emitServiceChanged(String name) {
     ServiceDescriptor sd = services.get(name);
-    if (sd != null)
+    if (sd != null) {
       emitEvent.accept("service", om.valueToTree(toView(sd)));
+    }
   }
 
   private void emitServicesChanged() {
@@ -322,74 +254,5 @@ public class ServiceManager {
 
   private List<ServiceView> sortedViews(List<ServiceView> views) {
     return ServiceViewMapper.sortByOrder(views, workspaceSupplier.get().getServiceOrder());
-  }
-
-  private void scheduleHealthCheck(String name, long pid, ServiceDescriptor sd) {
-    Thread t = new Thread(() -> {
-      try {
-        Thread.sleep(2000);
-        if (processManager.isAlive(pid))
-          return;
-        ServiceRuntime rt = sd.getRuntime();
-        rt.setStatus(ServiceStatus.ERROR);
-        rt.setLastError("Processo terminou após iniciar. Verifique os logs.");
-        rt.setPid(null);
-        try {
-          Path logFile = Path.of(sd.getDefinition().getLogFile());
-          if (Files.exists(logFile)) {
-            String tail = readLogTail(logFile, 10);
-            if (!tail.isBlank()) {
-              logManager.emitLogStatus(name, "Processo terminou. Últimas linhas:\n" + tail);
-            }
-          }
-        } catch (Exception ignored) {
-        }
-        persistRuntime.run();
-        emitServiceChanged(name);
-      } catch (InterruptedException ignored) {
-        Thread.currentThread().interrupt();
-      }
-    }, "check-alive-" + name);
-    t.setDaemon(true);
-    t.start();
-  }
-
-  private static String readLogTail(Path logFile, int maxLines) {
-    try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(logFile.toFile(), "r")) {
-      long len = raf.length();
-      if (len == 0) {
-        return "";
-      }
-      long pos = len - 1;
-      int lines = 0;
-      while (pos >= 0 && lines < maxLines) {
-        raf.seek(pos);
-        int b = raf.read();
-        if (b == '\n') {
-          lines++;
-        }
-        pos--;
-      }
-      long start = Math.max(0, pos + 1);
-      raf.seek(start);
-      byte[] bytes = new byte[(int) (len - start)];
-      raf.readFully(bytes);
-      return new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim();
-    } catch (Exception e) {
-      return "";
-    }
-  }
-
-  private void validatePhpProject(ServiceDefinition def) {
-    if (def.getProjectType() == ProjectType.STANDALONE_PHP) {
-      return;
-    }
-    if (PhpLaunchCommands.DOCKER_COMPOSE.equals(def.getSelectedScript())) {
-      return;
-    }
-    Path vendor = Path.of(def.getPath()).resolve("vendor/autoload.php");
-    if (!Files.isRegularFile(vendor)) {
-      throw new IllegalStateException("Dependências PHP ausentes. Execute composer install em " + def.getPath());
-    }
   }
 }

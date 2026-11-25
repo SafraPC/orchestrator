@@ -8,6 +8,7 @@
 | PhpLaunchCommands | Launch command builders + script selection apply |
 | PhpComposerScripts | Filters runtime vs QA composer scripts |
 | DockerComposeSupport | Detects compose files and published HTTP ports |
+| PhpPortSource | Porta declarada e o arquivo de origem (`.env`, compose, proxy Vite) |
 
 ## Recognition rules
 - Laravel: `artisan` or `laravel/framework`

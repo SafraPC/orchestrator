@@ -1,0 +1,12 @@
+# discovery
+
+Java/JS/PHP project scanners plus shared port-file helpers.
+
+| Type | Entry | Port files |
+| --- | --- | --- |
+| Spring | `java/ProjectScanner`, `java/PortExtractor` | `DeclaredPortFiles.springConfigFiles()` — `server.port` in `.properties` / YAML |
+| JS | `js/JsProjectScanner`, `DevServerPortDetector` | vite config, `.env`, `package.json` |
+| PHP | `php/PhpProjectScanner` | `.env`, compose files |
+
+`DeclaredPortFiles.preferred` is the file to open in the editor. `PortExtractor.locate` returns the first of those files that actually declares a port.
+`ConfigText.stripQuotes` is the shared quote stripper for `.env` / YAML port values.

@@ -13,6 +13,7 @@ public record ServiceView(
     Integer detectedPort,
     Integer customPort,
     String portStrategy,
+    String portFile,
     String javaHome,
     String javaVersion,
     String phpHome,

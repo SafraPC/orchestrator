@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.1 - 2026-11-25
+
+### Fixed
+- Keep the new process ID when a service is restarted inside the two-second health-check window.
+- Stop start from killing unrelated processes that occupy the service port; fail with a clear error so the port can be freed in the UI.
+- Stop leftover processes before rebuild so clearing runtime cache does not orphan running apps.
+- Load `workspace.json` when collection fields are null instead of crashing the core on boot.
+- Persist workspace and runtime through a temp file plus move so a crash mid-write cannot empty the workspace.
+- Honor per-request IPC timeouts so long Docker prune and remove jobs no longer kill the core at 45 seconds.
+- Force-stop a process that survived the first stop before restarting the service.
+- Match Spring `server.port` by exact key and a shared config-file list, including `application-local` files.
+
+### Changed
+- Updated release metadata to `2.0.1`.
+
 ## 2.0.0 - 2026-09-16
 
 ### Added

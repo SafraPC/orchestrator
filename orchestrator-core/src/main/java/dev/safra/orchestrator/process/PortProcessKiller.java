@@ -5,35 +5,11 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public final class PortProcessKiller {
   private PortProcessKiller() {
-  }
-
-  static void freePort(Map<String, String> env, boolean windows) {
-    if (env == null) return;
-    String portStr = env.getOrDefault("SERVER_PORT", env.get("PORT"));
-    if (portStr == null || portStr.isBlank()) return;
-    try {
-      int port = Integer.parseInt(portStr.trim());
-      if (isPortFree(port)) return;
-      for (int attempt = 0; attempt < 3; attempt++) {
-        if (windows) {
-          killWindowsPort(port);
-        } else {
-          killUnixPort(port);
-        }
-        if (waitUntilPortFree(port, attempt == 0 ? 20 : 30)) return;
-      }
-      throw new IllegalStateException("Porta " + port + " continua em uso após tentativa de liberação.");
-    } catch (IllegalStateException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalStateException("Falha ao liberar porta " + portStr + ": " + e.getMessage(), e);
-    }
   }
 
   private static void killWindowsPort(int port) throws Exception {

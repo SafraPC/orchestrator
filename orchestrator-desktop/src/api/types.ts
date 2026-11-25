@@ -30,6 +30,7 @@ export type ServiceDto = {
   detectedPort?: number | null;
   customPort?: number | null;
   portStrategy?: string | null;
+  portFile?: string | null;
   currentBranch?: string | null;
   javaHome?: string;
   javaVersion?: string;

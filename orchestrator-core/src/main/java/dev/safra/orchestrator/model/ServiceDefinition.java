@@ -15,6 +15,7 @@ public class ServiceDefinition {
   private Integer detectedPort;
   private Integer customPort;
   private String portStrategy;
+  private String portFile;
   private String javaHome;
   private String javaVersion;
   private String phpHome;

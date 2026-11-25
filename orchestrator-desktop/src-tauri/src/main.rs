@@ -11,11 +11,18 @@ use serde_json::Value;
 use tauri::{Manager, State};
 
 #[tauri::command]
-async fn core_request(app: tauri::AppHandle, bridge: State<'_, CoreBridge>, method: String, params: Value) -> Result<Value, String> {
+async fn core_request(
+  app: tauri::AppHandle,
+  bridge: State<'_, CoreBridge>,
+  method: String,
+  params: Value,
+  timeout_secs: Option<u64>,
+) -> Result<Value, String> {
   let bridge = bridge.inner().clone();
   let app_handle = app.clone();
+  let timeout_secs = timeout_secs.unwrap_or(45).clamp(5, 360);
   let resp: Value = tauri::async_runtime::spawn_blocking(move || {
-    bridge.ensure_started_and_send_request(&app_handle, &method, params)
+    bridge.ensure_started_and_send_request(&app_handle, &method, params, timeout_secs)
   })
   .await
   .map_err(|e| format!("Task falhou: {e}"))??;

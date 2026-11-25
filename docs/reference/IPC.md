@@ -51,13 +51,18 @@ Eventos assíncronos (logs) usam o terceiro formato e chegam à UI como `core_ev
 | `openServiceFolder` | `openServiceFolder` | Abre pasta no SO |
 | `openServiceTerminal` | `openServiceTerminal` | Abre terminal na pasta |
 | `openServiceInEditor` | `openServiceInEditor` | Abre no editor padrão |
+| `openServicePortFile` | `openServicePortFile` | Abre na IDE (Cursor se o projeto tem `.cursor`, senão VS Code se tem `.vscode`, senão Cursor e depois VS Code) o arquivo em que a porta foi declarada |
+| `refreshServicePorts` | `refreshServicePorts` | Relê a porta dos projetos de um container (`containerId`) ou de todos; a porta do arquivo passa a valer |
 | `listJdks` | `listJdks` | JDKs detectados na máquina |
+| `listPhpRuntimes` | `listPhpRuntimes` | Runtimes PHP detectados na máquina |
 | `getActiveJavaInfo` | `getActiveJavaInfo` | Java usado pelo core |
+| `getActivePhpInfo` | — | PHP no PATH (`php -v`) |
 | `setServiceScript` | `setServiceScript` | Script npm/PHP detectado |
 | `setServicePhpCommand` | `setServicePhpCommand` | Comando PHP manual |
 | `setServicePort` | `setServicePort` | Porta customizada |
 | `resetServicePort` | `resetServicePort` | Volta porta detectada |
 | `setServiceJavaVersion` | `setServiceJavaVersion` | JDK por serviço Spring |
+| `setServicePhpVersion` | `setServicePhpVersion` | PHP por serviço |
 | `setServiceMvnWrapper` | `setServiceMvnWrapper` | Usar `mvnw` do projeto |
 | `rebuildServices` | `rebuildServices` | Re-sincroniza definições |
 | `checkPortFree` | `checkPortFree` | Verifica se porta está livre |

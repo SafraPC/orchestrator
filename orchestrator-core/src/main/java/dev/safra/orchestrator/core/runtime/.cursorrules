@@ -4,8 +4,8 @@
 `CoreRuntime.java` fica na raiz de `core/runtime` e coordena o IPC.
 
 Subpacotes:
-- `workspace/` — estado persistido, roots, scan orchestration e merge pós-scan.
-- `service/` — ciclo de vida/configuração de serviços, branch atual e DTO `ServiceView`.
+- `workspace/` — estado persistido, roots, scan orchestration e merge pós-scan. `WorkspaceProjectScan` agrega scanners; `WorkspaceMetadataRefresh` re-lê scripts/porta JS/PHP.
+- `service/` — ciclo de vida/configuração de serviços, branch atual e DTO `ServiceView`. `ServiceBatchOps` cobre start/stop/restart em lote e por container.
 - `container/` — CRUD e vínculos de containers lógicos.
 - `logs/` — arquivo de log, assinaturas e emissão de eventos.
 - `discovery/java/` — scanner Spring Boot/Maven e porta Java.

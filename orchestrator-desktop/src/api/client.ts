@@ -18,23 +18,18 @@ function enqueueCoreRequest<T>(job: CoreJob<T>): Promise<T> {
 
 async function core<T>(method: string, params: unknown = {}, timeoutMs = CORE_REQUEST_TIMEOUT_MS): Promise<T> {
   return enqueueCoreRequest(async () => {
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
-      const result = await Promise.race([
-        invoke<T>("core_request", { method, params }),
-        new Promise<T>((_, reject) => {
-          timeoutHandle = setTimeout(
-            () => reject(new Error(`Timeout de ${timeoutMs / 1000}s aguardando resposta do core (${method}).`)),
-            timeoutMs,
-          );
-        }),
-      ]);
-      return result;
+      return await invoke<T>("core_request", {
+        method,
+        params,
+        timeoutSecs: Math.max(5, Math.ceil(timeoutMs / 1000)),
+      });
     } catch (error) {
-      if (error instanceof Error) throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+
       throw new Error(typeof error === "string" ? error : `Falha no core: ${String(error)}`);
-    } finally {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   });
 }
@@ -80,6 +75,9 @@ export const api = {
   openServiceFolder: (name: string) => core<{ ok: boolean; message: string }>("openServiceFolder", { name }),
   openServiceTerminal: (name: string) => core<{ ok: boolean; message: string }>("openServiceTerminal", { name }),
   openServiceInEditor: (name: string) => core<{ ok: boolean; message: string }>("openServiceInEditor", { name }),
+  openServicePortFile: (name: string) => core<{ ok: boolean; message: string }>("openServicePortFile", { name }),
+  refreshServicePorts: (containerId?: string | null) =>
+    core<ServiceDto[]>("refreshServicePorts", containerId ? { containerId } : {}),
 
   listJdks: () => core<JdkInfo[]>("listJdks"),
   listPhpRuntimes: () => core<PhpInfo[]>("listPhpRuntimes"),

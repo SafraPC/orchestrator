@@ -131,13 +131,14 @@ impl CoreBridge {
     app: &tauri::AppHandle,
     method: &str,
     params: Value,
+    timeout_secs: u64,
   ) -> Result<Value, String> {
     tlog(&format!("request recebido: {method}"));
     for attempt in 0..2 {
       let result = {
         let _g = self.session.lock().unwrap();
         self.ensure_started_under_lock(app)?;
-        self.send_request_session_held(method, params.clone())
+        self.send_request_session_held(method, params.clone(), timeout_secs)
       };
       match &result {
         Ok(v) => {
@@ -233,7 +234,7 @@ impl CoreBridge {
     Ok(())
   }
 
-  fn send_request_session_held(&self, method: &str, params: Value) -> Result<Value, String> {
+  fn send_request_session_held(&self, method: &str, params: Value, timeout_secs: u64) -> Result<Value, String> {
     let id = Uuid::new_v4().to_string();
     let req = serde_json::json!({
       "id": id,
@@ -256,7 +257,7 @@ impl CoreBridge {
     }
     stdin.flush().ok();
     drop(guard);
-    match rx.recv_timeout(Duration::from_secs(45)) {
+    match rx.recv_timeout(Duration::from_secs(timeout_secs.clamp(5, 360))) {
       Ok(resp) => {
         tlog(&format!("resposta ok {method} ({id})"));
         if let Some(got) = resp.get("id").and_then(|x| x.as_str()) {

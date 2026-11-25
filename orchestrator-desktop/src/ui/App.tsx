@@ -1,30 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
-import type { ContainerDto, ServiceDto } from "../api/types";
-import { ContainersPanel } from "./ContainersPanel";
-import { ContainerTabs } from "./ContainerTabs";
-import { Dropdown } from "./Dropdown";
-import { Icon } from "./Icons";
-import { ImportSection } from "./ImportSection";
-import { KillPortModal } from "./KillPortModal";
-import { LogsPanel } from "./LogsPanel";
-import { mergeSubsetOrder } from "./mergeSubsetOrder";
-import { ResizeHandle } from "./ResizeHandle";
-import { ServiceTable } from "./ServiceTable";
-import { SettingsPanel, useSettings } from "./SettingsPanel";
-import { StatusBar } from "./StatusBar";
-import { Toast, useToast } from "./Toast";
-import { Toolbar } from "./Toolbar";
-import type { AppSection } from "./Toolbar";
-import { Tooltip } from "./Tooltip";
-import { DockerView } from "./docker/DockerView";
-import { useCoreEvents } from "./useCoreEvents";
-import { useJavaRuntime } from "./useJavaRuntime";
-import { useServiceBranchPolling } from "./useServiceBranchPolling";
-import { useServiceFilters } from "./useServiceFilters";
-import { useServiceShortcuts } from "./useServiceShortcuts";
-import { useAppUpdater } from "./useAppUpdater";
-import { useWorkspaceData } from "./useWorkspaceData";
+import type { ServiceDto } from "../api/types";
+import { DockerView } from "./docker/docker/DockerView";
+import { ServicesWorkspace } from "./layout/ServicesWorkspace";
+import { Toolbar } from "./layout/Toolbar";
+import type { AppSection } from "./layout/Toolbar";
+import { KillPortModal } from "./ports/KillPortModal";
+import { SettingsPanel, useSettings } from "./config/SettingsPanel";
+import { Toast, useToast } from "./toast/Toast";
+import { mergeSubsetOrder } from "./workspace/merge/mergeSubsetOrder";
+import { useAppUpdater } from "./workspace/hooks/useAppUpdater";
+import { useCoreEvents } from "./workspace/hooks/useCoreEvents";
+import { useJavaRuntime } from "./workspace/hooks/useJavaRuntime";
+import { useWorkspaceData } from "./workspace/hooks/useWorkspaceData";
+import { useServiceBranchPolling } from "./service-table/hooks/useServiceBranchPolling";
+import { useServiceFilters } from "./service-table/hooks/useServiceFilters";
+import { useServiceShortcuts } from "./service-table/hooks/useServiceShortcuts";
 
 export function App(props: { onReady?: () => void }) {
   const [section, setSection] = useState<AppSection>("services");
@@ -65,8 +55,8 @@ export function App(props: { onReady?: () => void }) {
     refresh,
     refreshData,
     refreshJdks,
-    refreshPhps,
     rebuildServices,
+    refreshDeclaredPorts,
   } = workspace;
 
   const {
@@ -114,7 +104,9 @@ export function App(props: { onReady?: () => void }) {
       setSelectedContainer(id);
       if (id) {
         const svcInContainer = services.filter((s) => s.containerIds?.includes(id));
-        if (svcInContainer.length < 2 && svcInContainer.length > 0) setSelected(svcInContainer[0].name);
+        if (svcInContainer.length < 2 && svcInContainer.length > 0) {
+          setSelected(svcInContainer[0].name);
+        }
       }
       setFilterText("");
       await refresh();
@@ -159,138 +151,52 @@ export function App(props: { onReady?: () => void }) {
         section={section}
         onSectionChange={setSection}
       />
-      <main
-        className="flex-1 min-h-0"
-        style={{ display: section === "services" ? "flex" : "none" }}
-      >
-        <aside
-          className="shrink-0 border-r border-white/[0.04]"
-          style={{
-            width: containersCollapsed ? 40 : sideW,
-            transition: containersCollapsed ? "width 0.2s" : undefined,
-          }}
-        >
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.04]">
-            <span
-              className={`text-2xs font-semibold uppercase tracking-widest text-slate-600 transition-opacity ${
-                containersCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
-              }`}
-            >
-              Containers
-            </span>
-            <Tooltip text={containersCollapsed ? "Expandir" : "Recolher"}>
-              <button
-                className="btn-ghost rounded p-1"
-                onClick={() => setContainersCollapsed(!containersCollapsed)}
-              >
-                <Icon.Chevron
-                  className={`h-3 w-3 text-slate-600 transition-transform duration-200 ${
-                    containersCollapsed ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-            </Tooltip>
-          </div>
-          <div
-            className={`transition-opacity duration-200 ${
-              containersCollapsed
-                ? "opacity-0 pointer-events-none h-0 overflow-hidden"
-                : "opacity-100 h-[calc(100%-37px)]"
-            }`}
-          >
-            <ContainersPanel
-              services={services}
-              containers={containers}
-              selectedContainer={selectedContainer}
-              onSelectContainer={handleSelectContainer}
-              onRefresh={refresh}
-              onContainersChanged={refresh}
-              onContainersReorder={setContainers}
-              onToast={addToast}
-            />
-          </div>
-        </aside>
-        {!containersCollapsed && <ResizeHandle value={sideW} onChange={setSideW} min={180} max={420} />}
-
-        <section className="flex flex-col shrink-0 border-r border-white/[0.04]" style={{ width: svcW }}>
-          <div className="px-3 py-2.5 border-b border-white/[0.04] space-y-2">
-            <ContainerTabs
-              containers={containers}
-              selectedContainer={selectedContainer}
-              onSelect={handleSelectContainer}
-              onContainersChanged={refresh}
-              onToast={addToast}
-            />
-            <ImportSection onImported={refresh} addToast={addToast} />
-            <div className="flex items-center gap-1.5">
-              <div className="relative flex-1 min-w-0">
-                <Icon.Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-600 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Filtrar..."
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                  className="input pl-7 text-2xs"
-                />
-              </div>
-              {availableTechs.length > 1 && (
-                <Dropdown
-                  value={techFilter}
-                  onChange={setTechFilter}
-                  options={techDropdownOptions}
-                  placeholder="Filtrar"
-                  align="right"
-                />
-              )}
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-            <ServiceTable
-              services={filteredServices}
-              allServices={services}
-              selected={selected}
-              onSelect={setSelected}
-              selectedServices={selectedServices}
-              onSelectedServicesChange={setSelectedServices}
-              onAction={refresh}
-              onServicesUpdate={handleServicesReorder}
-              selectedContainer={selectedContainer}
-              containers={containers}
-              jdks={jdks}
-              phps={phps}
-              onToast={addToast}
-              loading={loading}
-            />
-          </div>
-          <StatusBar
-            services={services}
-            selectedContainer={selectedContainer}
-            filteredCount={filteredServices.length}
-            update={appUpdate}
-          />
-        </section>
-        <ResizeHandle value={svcW} onChange={setSvcW} min={220} max={450} />
-
-        <section className="flex flex-1 min-w-0 flex-col relative">
-          <LogsPanel
-            service={selectedService}
-            selectedServices={selectedLogServices}
-            selectedContainer={selectedContainer}
-            containerServices={containerServices}
-            fontSize={settings.fontSize}
-            lineWrap={settings.logLineWrap}
-            onToast={addToast}
-          />
-        </section>
-      </main>
-
+      <ServicesWorkspace
+        hidden={section !== "services"}
+        containersCollapsed={containersCollapsed}
+        onToggleContainers={() => setContainersCollapsed(!containersCollapsed)}
+        sideW={sideW}
+        onSideW={setSideW}
+        svcW={svcW}
+        onSvcW={setSvcW}
+        services={services}
+        containers={containers}
+        selectedContainer={selectedContainer}
+        onSelectContainer={handleSelectContainer}
+        onRefresh={refresh}
+        onRefreshPorts={async () => {
+          await refreshDeclaredPorts(selectedContainer);
+        }}
+        onContainersReorder={setContainers}
+        onToast={addToast}
+        filterText={filterText}
+        onFilterText={setFilterText}
+        techFilter={techFilter}
+        onTechFilter={setTechFilter}
+        availableTechs={availableTechs}
+        techDropdownOptions={techDropdownOptions}
+        filteredServices={filteredServices}
+        selected={selected}
+        onSelect={setSelected}
+        selectedServices={selectedServices}
+        onSelectedServicesChange={setSelectedServices}
+        onServicesUpdate={handleServicesReorder}
+        jdks={jdks}
+        phps={phps}
+        loading={loading}
+        selectedService={selectedService}
+        selectedLogServices={selectedLogServices}
+        containerServices={containerServices}
+        fontSize={settings.fontSize}
+        lineWrap={settings.logLineWrap}
+        update={appUpdate}
+      />
       <section
         className="flex-1 min-h-0 flex-col"
         style={{ display: section === "docker" ? "flex" : "none" }}
       >
         <DockerView active={section === "docker"} onToast={addToast} />
       </section>
-
       <KillPortModal
         open={killPortOpen}
         onClose={() => setKillPortOpen(false)}

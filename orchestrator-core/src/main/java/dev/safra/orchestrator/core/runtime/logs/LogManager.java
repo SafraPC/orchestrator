@@ -24,6 +24,10 @@ public class LogManager {
   }
 
   public JsonNode subscribe(String name, String logFilePath, int tail) {
+    if (logFilePath == null || logFilePath.isBlank()) {
+      throw new IllegalStateException("Serviço sem arquivo de log: " + name);
+    }
+
     String subId = UUID.randomUUID().toString();
     Path logFile = Path.of(logFilePath).toAbsolutePath().normalize();
 

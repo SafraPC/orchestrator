@@ -1,6 +1,5 @@
 package dev.safra.orchestrator.core.runtime.workspace;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.safra.orchestrator.core.runtime.discovery.java.PortExtractor;
@@ -15,10 +14,8 @@ import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
 import dev.safra.orchestrator.model.ServiceDescriptor;
 import dev.safra.orchestrator.model.ServiceRuntime;
-import dev.safra.orchestrator.model.ServiceStatus;
 import dev.safra.orchestrator.model.ServiceView;
 import dev.safra.orchestrator.model.Workspace;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,11 +31,9 @@ public class WorkspaceManager {
   private final Path runtimeFile;
   private final ObjectMapper om;
   private final StateStore store;
-  private final ProjectScanner scanner;
-  private final JsProjectScanner jsScanner;
-  private final StandaloneJsScanner standaloneScanner;
-  private final PhpProjectScanner phpScanner;
-  private final StandalonePhpScanner standalonePhpScanner;
+  private final WorkspaceProjectScan projectScan;
+  private final WorkspaceMetadataRefresh metadataRefresh;
+  private final WorkspaceLoader loader;
   private final BiConsumer<String, JsonNode> emitEvent;
 
   private Workspace workspace;
@@ -55,11 +50,16 @@ public class WorkspaceManager {
     this.workspaceFile = stateDir.resolve("workspace.json");
     this.runtimeFile = stateDir.resolve("runtime.json");
     Path logsDir = stateDir.resolve("logs");
-    this.scanner = new ProjectScanner(store, portExtractor, logsDir);
-    this.jsScanner = new JsProjectScanner(om, logsDir);
-    this.standaloneScanner = new StandaloneJsScanner(logsDir);
-    this.phpScanner = new PhpProjectScanner(om, logsDir);
-    this.standalonePhpScanner = new StandalonePhpScanner(logsDir);
+    JsProjectScanner jsScanner = new JsProjectScanner(om, logsDir);
+    PhpProjectScanner phpScanner = new PhpProjectScanner(om, logsDir);
+    this.projectScan = new WorkspaceProjectScan(
+        new ProjectScanner(store, portExtractor, logsDir),
+        jsScanner,
+        new StandaloneJsScanner(logsDir),
+        phpScanner,
+        new StandalonePhpScanner(logsDir));
+    this.metadataRefresh = new WorkspaceMetadataRefresh(jsScanner, phpScanner, portExtractor);
+    this.loader = new WorkspaceLoader(stateDir, workspaceFile, runtimeFile, store);
   }
 
   public Workspace getWorkspace() {
@@ -67,55 +67,17 @@ public class WorkspaceManager {
   }
 
   public void loadAll() {
-    try {
-      Files.createDirectories(stateDir);
-      Files.createDirectories(stateDir.resolve("logs"));
-    } catch (Exception e) {
-      throw new IllegalStateException("Não consegui criar stateDir: " + stateDir, e);
-    }
-
-    this.workspace = store.readJson(workspaceFile, Workspace.class).orElseGet(Workspace::new);
-    if (workspace.getContainers() == null)
-      workspace.setContainers(new HashMap<>());
-    if (workspace.getRemovedServices() == null)
-      workspace.setRemovedServices(new HashSet<>());
-
-    Map<String, ServiceRuntime> runtime = store.readJson(runtimeFile, new TypeReference<Map<String, ServiceRuntime>>() {
-    }).orElseGet(HashMap::new);
-    Map<String, ServiceDescriptor> existing = new HashMap<>(services);
-    services.clear();
-
-    for (ServiceDefinition def : workspace.getServices()) {
-      if (def.getName() == null || def.getName().isBlank())
-        continue;
-      if (def.getProjectType() == null)
-        def.setProjectType(ProjectType.SPRING_BOOT);
-
-      if (def.getContainerIds() == null)
-        def.setContainerIds(new ArrayList<>());
-      ServiceDescriptor sd = new ServiceDescriptor();
-      sd.setDefinition(def);
-      ServiceRuntime rt = existing.containsKey(def.getName())
-          ? existing.get(def.getName()).getRuntime()
-          : runtime.getOrDefault(def.getName(), new ServiceRuntime());
-      if (rt.getPid() != null) {
-        boolean alive = ProcessHandle.of(rt.getPid()).map(ProcessHandle::isAlive).orElse(false);
-        rt.setStatus(alive ? ServiceStatus.RUNNING : ServiceStatus.STOPPED);
-        if (!alive)
-          rt.setPid(null);
-      }
-      sd.setRuntime(rt);
-      services.put(def.getName(), sd);
-    }
-    syncServiceOrder();
-    syncContainerOrder();
+    this.workspace = loader.load(services);
+    WorkspaceOrder.syncServices(workspace);
+    WorkspaceOrder.syncContainers(workspace);
     persistRuntime();
     persistWorkspace();
   }
 
   public JsonNode importRootAndScan(String root) {
-    if (root == null || root.isBlank())
+    if (root == null || root.isBlank()) {
       throw new IllegalArgumentException("params.root é obrigatório");
+    }
     return importRootsAndScan(List.of(root), null);
   }
 
@@ -124,35 +86,37 @@ public class WorkspaceManager {
   }
 
   public JsonNode importRootsAndScan(List<String> roots, String containerId) {
-    if (roots == null || roots.isEmpty())
+    if (roots == null || roots.isEmpty()) {
       throw new IllegalArgumentException("params.roots é obrigatório");
-    if (containerId != null && !containerId.isBlank() && !workspace.getContainers().containsKey(containerId))
+    }
+    if (containerId != null && !containerId.isBlank() && !workspace.getContainers().containsKey(containerId)) {
       throw new IllegalArgumentException("Container não encontrado: " + containerId);
+    }
 
     List<Path> importedPaths = new ArrayList<>();
     List<ServiceDefinition> found = new ArrayList<>();
     for (String root : roots) {
       Path p = Path.of(root).toAbsolutePath().normalize();
       importedPaths.add(p);
-      found.addAll(scanner.scanRoot(p, workspace.getExcludeDirs()));
-      found.addAll(phpScanner.scanRoot(p, workspace.getExcludeDirs()));
-      found.addAll(standalonePhpScanner.scanRoot(p, workspace.getExcludeDirs()));
-      found.addAll(jsScanner.scanRoot(p, workspace.getExcludeDirs()));
-      found.addAll(standaloneScanner.scanRoot(p, workspace.getExcludeDirs()));
+      found.addAll(projectScan.scan(p, workspace.getExcludeDirs()));
     }
 
     Set<String> existingNames = new HashSet<>();
-    for (ServiceDefinition s : workspace.getServices())
+    for (ServiceDefinition s : workspace.getServices()) {
       existingNames.add(s.getName());
+    }
 
     int added = 0;
     for (ServiceDefinition def : found) {
-      if (existingNames.contains(def.getName()))
+      if (existingNames.contains(def.getName())) {
         continue;
-      if (def.getProjectType() == null)
+      }
+      if (def.getProjectType() == null) {
         continue;
-      if (!ImportPathMatcher.isUnderImported(def.getPath(), importedPaths))
+      }
+      if (!ImportPathMatcher.isUnderImported(def.getPath(), importedPaths)) {
         continue;
+      }
       workspace.getServices().add(def);
       existingNames.add(def.getName());
       added++;
@@ -161,7 +125,7 @@ public class WorkspaceManager {
     int assigned = ImportPathMatcher.assignContainer(workspace.getServices(), importedPaths, containerId);
 
     if (added > 0 || assigned > 0) {
-      syncServiceOrder();
+      WorkspaceOrder.syncServices(workspace);
       persistWorkspace();
     }
 
@@ -171,8 +135,9 @@ public class WorkspaceManager {
   }
 
   public JsonNode removeRoot(String root) {
-    if (root == null || root.isBlank())
+    if (root == null || root.isBlank()) {
       throw new IllegalArgumentException("params.root é obrigatório");
+    }
     workspace.getRoots().removeIf(r -> r.equals(root));
     persistWorkspace();
     return scanRoots();
@@ -196,17 +161,14 @@ public class WorkspaceManager {
 
     List<ServiceDefinition> found = new ArrayList<>();
     for (String r : workspace.getRoots()) {
-      found.addAll(scanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
-      found.addAll(phpScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
-      found.addAll(standalonePhpScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
-      found.addAll(jsScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
-      found.addAll(standaloneScanner.scanRoot(Path.of(r), workspace.getExcludeDirs()));
+      found.addAll(projectScan.scan(Path.of(r), workspace.getExcludeDirs()));
     }
 
     Map<String, ServiceDefinition> byName = new HashMap<>();
     for (ServiceDefinition d : found) {
-      if (!workspace.getRemovedServices().contains(d.getName()))
+      if (!workspace.getRemovedServices().contains(d.getName())) {
         byName.put(d.getName(), d);
+      }
     }
 
     for (Map.Entry<String, List<String>> entry : savedContainerIds.entrySet()) {
@@ -220,8 +182,8 @@ public class WorkspaceManager {
     WorkspaceDefinitionSync.mergeScannedWithPrevious(byName, previousByName);
 
     workspace.setServices(new ArrayList<>(byName.values()));
-    syncServiceOrder();
-    syncContainerOrder();
+    WorkspaceOrder.syncServices(workspace);
+    WorkspaceOrder.syncContainers(workspace);
     persistWorkspace();
     loadAll();
     emitEvent.accept("workspace", om.valueToTree(workspace));
@@ -244,7 +206,9 @@ public class WorkspaceManager {
     loadAll();
     for (Map.Entry<String, List<String>> entry : savedContainerIds.entrySet()) {
       ServiceDescriptor sd = services.get(entry.getKey());
-      if (sd == null) continue;
+      if (sd == null) {
+        continue;
+      }
       List<String> valid = entry.getValue().stream()
           .filter(id -> workspace.getContainers().containsKey(id))
           .toList();
@@ -266,35 +230,8 @@ public class WorkspaceManager {
     }
   }
 
-  public void refreshDynamicJsMetadata() {
-    refreshDynamicProjectMetadata();
-  }
-
   public boolean refreshDynamicProjectMetadata(ServiceDefinition def) {
-    if (def == null || def.getProjectType() == null || def.getProjectType() == ProjectType.SPRING_BOOT) {
-      return false;
-    }
-    if (PhpLaunchCommands.isPhpProject(def.getProjectType())) {
-      return refreshDynamicPhpMetadata(def);
-    }
-    return refreshDynamicJsMetadata(def);
-  }
-
-  public boolean refreshDynamicPhpMetadata(ServiceDefinition def) {
-    if (def == null || !PhpLaunchCommands.isPhpProject(def.getProjectType())) {
-      return false;
-    }
-    List<String> beforeScripts = def.getAvailableScripts() == null ? List.of() : new ArrayList<>(def.getAvailableScripts());
-    Integer beforePort = def.getDetectedPort();
-    String beforeStrategy = def.getPortStrategy();
-    String beforeSelected = def.getSelectedScript();
-    List<String> beforeCommand = def.getCommand() == null ? List.of() : new ArrayList<>(def.getCommand());
-    phpScanner.refreshServiceDefinition(def);
-    return !beforeScripts.equals(def.getAvailableScripts() == null ? List.of() : def.getAvailableScripts())
-        || !java.util.Objects.equals(beforePort, def.getDetectedPort())
-        || !java.util.Objects.equals(beforeStrategy, def.getPortStrategy())
-        || !java.util.Objects.equals(beforeSelected, def.getSelectedScript())
-        || !beforeCommand.equals(def.getCommand() == null ? List.of() : def.getCommand());
+    return metadataRefresh.refresh(def);
   }
 
   public boolean refreshDynamicJsMetadata(ServiceDefinition def) {
@@ -302,26 +239,27 @@ public class WorkspaceManager {
         || PhpLaunchCommands.isPhpProject(def.getProjectType())) {
       return false;
     }
-    List<String> beforeScripts = def.getAvailableScripts() == null ? List.of() : new ArrayList<>(def.getAvailableScripts());
-    Integer beforePort = def.getDetectedPort();
-    String beforeStrategy = def.getPortStrategy();
-    String beforeSelected = def.getSelectedScript();
-    List<String> beforeCommand = def.getCommand() == null ? List.of() : new ArrayList<>(def.getCommand());
-    jsScanner.refreshServiceDefinition(def);
-    return !beforeScripts.equals(def.getAvailableScripts() == null ? List.of() : def.getAvailableScripts())
-        || !java.util.Objects.equals(beforePort, def.getDetectedPort())
-        || !java.util.Objects.equals(beforeStrategy, def.getPortStrategy())
-        || !java.util.Objects.equals(beforeSelected, def.getSelectedScript())
-        || !beforeCommand.equals(def.getCommand() == null ? List.of() : def.getCommand());
+    return metadataRefresh.refresh(def);
+  }
+
+  public boolean refreshDynamicPhpMetadata(ServiceDefinition def) {
+    if (def == null || !PhpLaunchCommands.isPhpProject(def.getProjectType())) {
+      return false;
+    }
+    return metadataRefresh.refresh(def);
+  }
+
+  public JsonNode refreshDeclaredPorts(String containerId) {
+    metadataRefresh.refreshScope(services.values(), containerId, this::persistWorkspace);
+    return buildSortedServiceList();
+  }
+
+  public Path preparePortFile(ServiceDefinition def) {
+    return metadataRefresh.preparePortFile(def, this::persistWorkspace);
   }
 
   private JsonNode buildSortedServiceList() {
-    return om.valueToTree(sortedViews(services.values().stream()
-        .map(this::toView).toList()));
-  }
-
-  private ServiceView toView(ServiceDescriptor sd) {
-    return ServiceViewMapper.fromDescriptor(sd);
+    return om.valueToTree(sortedViews(services.values().stream().map(ServiceViewMapper::fromDescriptor).toList()));
   }
 
   public JsonNode reorderServices(List<String> order) {
@@ -337,21 +275,11 @@ public class WorkspaceManager {
   }
 
   public void syncServiceOrder() {
-    if (workspace.getServiceOrder() == null)
-      workspace.setServiceOrder(new ArrayList<>());
-    List<String> order = workspace.getServiceOrder();
-    List<String> existing = workspace.getServices().stream().map(ServiceDefinition::getName).toList();
-    order.retainAll(existing);
-    existing.stream().filter(n -> !order.contains(n)).forEach(order::add);
+    WorkspaceOrder.syncServices(workspace);
   }
 
   public void syncContainerOrder() {
-    if (workspace.getContainerOrder() == null)
-      workspace.setContainerOrder(new ArrayList<>());
-    List<String> order = workspace.getContainerOrder();
-    List<String> existing = new ArrayList<>(workspace.getContainers().keySet());
-    order.retainAll(existing);
-    existing.stream().filter(id -> !order.contains(id)).forEach(order::add);
+    WorkspaceOrder.syncContainers(workspace);
   }
 
   List<ServiceView> sortedViews(List<ServiceView> views) {
@@ -364,9 +292,9 @@ public class WorkspaceManager {
 
   public void persistRuntime() {
     Map<String, ServiceRuntime> m = new HashMap<>();
-    for (ServiceDescriptor sd : services.values())
+    for (ServiceDescriptor sd : services.values()) {
       m.put(sd.getDefinition().getName(), sd.getRuntime());
+    }
     store.writeJson(runtimeFile, m);
   }
-
 }

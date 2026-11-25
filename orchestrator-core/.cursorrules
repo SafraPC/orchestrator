@@ -21,7 +21,7 @@
 | `core.runtime.docker` | Real Docker via CLI: engine status/start (Colima aware), containers/images/volumes, batch remove, prune. See local `.cursorrules` |
 | `model` | Domain: Workspace (aggregate), ServiceDefinition, ServiceView (read model), Container |
 | `model.docker` | Docker read models: DockerEngineStatus, DockerInventory, container/image/volume summaries |
-| `process` | OS/process infrastructure (ProcessManager, PortProcessKiller, ProcessTreeKiller, ListeningPortScanner, DevPortHeuristics, ProcessSnapshot) |
+| `process` | OS/process infrastructure. `ProcessManager` façade; launch env/command/port helpers are package-private. See `process/.cursorrules` |
 
 ## Persistence (`--stateDir`)
 - `workspace.json` — roots, services, containers, removedServices
@@ -46,4 +46,4 @@ mvn clean package -DskipTests # standalone JAR → copy to desktop src-tauri/
 ```
 
 ## Key classes
-CoreRuntime, WorkspaceManager, ServiceManager, ServiceConfigurator, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, ProcessTreeKiller, PortProcessKiller, JavaVersionDetector, WorkspaceDefinitionSync, StateStore
+CoreRuntime, WorkspaceManager, ServiceManager, ServiceBatchOps, ServiceConfigurator, ServiceLaunchPrep, ServiceHealthCheck, ServiceViewMapper, ContainerManager, LogManager, ProjectScanner, JsProjectScanner, PhpProjectScanner, DevServerPortDetector, ProcessManager, ProcessCommandBuilder, ProcessLaunchEnv, ProcessTreeKiller, PortProcessKiller, JavaVersionDetector, WorkspaceDefinitionSync, WorkspaceProjectScan, StateStore

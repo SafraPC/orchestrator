@@ -4,7 +4,7 @@
 ```
 src/
   api/           client.ts (IPC), types.ts (DTOs)
-  ui/            React components + hooks (see ui/README.md)
+  ui/            App.tsx composition root; category folders (see ui/README.md)
   ui/docker/     Docker section (engine, containers, images, volumes)
 src-tauri/src/
   main.rs        Tauri commands
@@ -13,13 +13,30 @@ src-tauri/src/
   java_env.rs    Java 17+ validation
 ```
 
+## UI
+`App.tsx` is the composition root at `src/ui/`. Primitives each own a kebab folder (`icons/Icons`, `modal`, `dropdown`, `tooltip`, `toast`, `resize-handle`). Shared menu items live in `src/ui/components/context-menu-items/`.
+
+| Folder | Responsibility |
+| --- | --- |
+| `components/context-menu-items/` | Shared menu items (`ContextMenuItems`) |
+| `layout/` | Toolbar, status bar, import, services workspace chrome |
+| `service-table/` | Service table owner plus row, context menu, tech/script metadata |
+| `containers/` | Logical workspace containers (not Docker) |
+| `logs/` | Service logs and multi-service monitor |
+| `config/` | Preferences and Java runtime |
+| `ports/` | Kill-port modal and listening ports |
+| `workspace/` | Workspace bootstrap hooks and reorder helpers |
+| `docker/docker/` | Real Docker engine, images, volumes |
+| `docker/hooks/` | Docker data and action hooks |
+| `icons/` | `Icons.tsx` plus SVG sets |
+
 ## IPC flow
 React `api.*` → `invoke("core_request")` → CoreBridge → Java → response / log events via `useCoreEvents`.
 
 Contract table: repo `docs/reference/IPC.md`. Integration flow: `docs/integration/INTEGRATION.md`.
 
 ## Rust notes
-- `core_bridge`: single session mutex for request lifecycle; recv timeout kills JVM; one retry on shutdown/transport errors
+- `core_bridge`: single session mutex for request lifecycle; recv timeout is per-request (`timeoutSecs`, 5–360s) and kills JVM on expiry; one retry on shutdown/transport errors
 - stdout reader: `read_until` + `from_utf8_lossy` (not line iterator)
 - Core not started in Tauri `.setup`
 - stderr trace: `ORCHESTRATOR_CORE_TRACE=1`, log file `desktop-logs/core.stderr.log`
@@ -34,7 +51,7 @@ Contract table: repo `docs/reference/IPC.md`. Integration flow: `docs/integratio
 `devUrl` must stay `http://127.0.0.1:5173`; Vite `--host 127.0.0.1`.
 
 ## Hooks
-See `src/ui/README.md`. App.tsx uses `useWorkspaceData`, `useServiceFilters`, `useCoreEvents`, `useServiceBranchPolling`, `useServiceShortcuts`, `useJavaRuntime`.
+See `src/ui/README.md`. App.tsx uses `useWorkspaceData`, `useServiceFilters`, `useCoreEvents`, `useServiceBranchPolling`, `useServiceShortcuts`, `useJavaRuntime` from `ui/workspace/hooks` and `ui/service-table/hooks`.
 
 ## Top-level sections
 `Toolbar` switches `AppSection` (`services` | `docker`). The services `<main>` stays mounted and is hidden via inline `display` so log subscriptions survive the switch; `DockerView` only fetches/polls when `active`.

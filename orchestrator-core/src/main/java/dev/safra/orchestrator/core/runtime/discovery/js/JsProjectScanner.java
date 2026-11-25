@@ -2,6 +2,7 @@ package dev.safra.orchestrator.core.runtime.discovery.js;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.safra.orchestrator.core.runtime.discovery.PortDeclaration;
 import dev.safra.orchestrator.core.runtime.discovery.php.PhpLaunchCommands;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
@@ -105,6 +106,7 @@ public class JsProjectScanner {
       }
       def.setAvailableScripts(metadata.scripts());
       def.setDetectedPort(metadata.detectedPort());
+      def.setPortFile(portPath(metadata.portFile()));
       def.setPortStrategy(metadata.portStrategy());
       def.setSelectedScript(metadata.selectedScript());
       def.setCommand(JsLaunchCommands.npmRunCommand(metadata.selectedScript()));
@@ -127,6 +129,7 @@ public class JsProjectScanner {
       def.setProjectType(metadata.projectType());
       def.setAvailableScripts(metadata.scripts());
       def.setDetectedPort(metadata.detectedPort());
+      def.setPortFile(portPath(metadata.portFile()));
       def.setPortStrategy(metadata.portStrategy());
       def.setSelectedScript(metadata.selectedScript());
       def.setCommand(JsLaunchCommands.npmRunCommand(metadata.selectedScript()));
@@ -160,11 +163,14 @@ public class JsProjectScanner {
 
     String selectedScript = selectScript(scripts, type, preferredScript);
     String scriptCommand = root.path("scripts").path(selectedScript).asText("");
+    PortDeclaration declaration = extractPort(root, dir, selectedScript, type, scriptCommand);
+
     return new JsMetadata(
         type,
         scripts,
         selectedScript,
-        extractPort(root, dir, selectedScript, type, scriptCommand),
+        declaration.port(),
+        declaration.file(),
         JsFrameworkDetector.resolvePortStrategy(scriptCommand, type));
   }
 
@@ -190,39 +196,54 @@ public class JsProjectScanner {
     return out;
   }
 
-  private int extractPort(JsonNode root, Path dir, String selectedScript, ProjectType type, String scriptCommand) {
+  private PortDeclaration extractPort(JsonNode root, Path dir, String selectedScript, ProjectType type, String scriptCommand) {
     JsonNode scripts = root.path("scripts");
+    Path packageJson = dir.resolve("package.json");
+
     if (scripts.isObject() && scripts.has(selectedScript)) {
       Integer fromSelectedScript = DevServerPortDetector.parsePort(scripts.get(selectedScript).asText(""));
+
       if (fromSelectedScript != null) {
-        return fromSelectedScript;
+        return PortDeclaration.of(fromSelectedScript, packageJson);
       }
     }
+
     if (scripts.isObject()) {
       for (var it = scripts.fields(); it.hasNext();) {
         var entry = it.next();
         Integer fromScript = DevServerPortDetector.parsePort(entry.getValue().asText(""));
+
         if (fromScript != null) {
-          return fromScript;
+          return PortDeclaration.of(fromScript, packageJson);
         }
       }
     }
-    Integer envPort = readEnvPort(dir);
+
+    PortDeclaration envPort = DevServerPortDetector.locateEnvPort(dir, List.of("PORT", "VITE_PORT"));
+
     if (envPort != null) {
       return envPort;
     }
-    Integer vitePort = DevServerPortDetector.readViteServerPort(dir);
+
+    PortDeclaration vitePort = DevServerPortDetector.locateViteServerPort(dir);
+
     if (vitePort != null) {
       return vitePort;
     }
+
     if (JsFrameworkDetector.usesVite(root, scriptCommand)) {
-      return 5173;
+      return PortDeclaration.of(5173, null);
     }
-    return JsFrameworkDetector.defaultPort(type);
+
+    return PortDeclaration.of(JsFrameworkDetector.defaultPort(type), null);
   }
 
-  private Integer readEnvPort(Path dir) {
-    return DevServerPortDetector.readEnvPort(dir, List.of("PORT", "VITE_PORT"));
+  private static String portPath(Path file) {
+    if (file == null) {
+      return null;
+    }
+
+    return file.toAbsolutePath().normalize().toString();
   }
 
   private String selectScript(List<String> scripts, ProjectType type, String preferredScript) {
@@ -242,6 +263,7 @@ public class JsProjectScanner {
       List<String> scripts,
       String selectedScript,
       int detectedPort,
+      Path portFile,
       String portStrategy) {
   }
 }

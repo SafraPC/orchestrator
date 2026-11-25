@@ -2,8 +2,10 @@ package dev.safra.orchestrator.core.runtime.workspace;
 
 import java.io.BufferedInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -45,11 +47,27 @@ public class StateStore {
   }
 
   public void writeJson(Path file, Object value) {
+    Path tmp = null;
+
     try {
       Files.createDirectories(file.getParent());
       byte[] bytes = om.writerWithDefaultPrettyPrinter().writeValueAsBytes(value);
-      Files.write(file, bytes);
+      tmp = file.resolveSibling(file.getFileName() + ".tmp");
+      Files.write(tmp, bytes);
+
+      try {
+        Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+      } catch (AtomicMoveNotSupportedException e) {
+        Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+      }
     } catch (Exception e) {
+      if (tmp != null) {
+        try {
+          Files.deleteIfExists(tmp);
+        } catch (Exception ignored) {
+        }
+      }
+
       throw new IllegalStateException("Falha ao salvar: " + file, e);
     }
   }

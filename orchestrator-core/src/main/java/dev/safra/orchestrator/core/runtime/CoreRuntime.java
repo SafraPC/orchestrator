@@ -146,6 +146,8 @@ public class CoreRuntime {
       case "openServiceFolder" -> openServicePath(IpcParams.reqName(params), "Pasta aberta", launcher::openFolder);
       case "openServiceTerminal" -> openServicePath(IpcParams.reqName(params), "Terminal aberto", launcher::openTerminal);
       case "openServiceInEditor" -> openServicePath(IpcParams.reqName(params), "Editor aberto", launcher::openEditor);
+      case "openServicePortFile" -> openServicePortFile(IpcParams.reqName(params));
+      case "refreshServicePorts" -> workspaceManager.refreshDeclaredPorts(IpcParams.text(params, "containerId"));
       case "listJdks" -> {
         List<JavaVersionDetector.JdkInfo> jdks = processManager.getJavaDetector().detectAll();
         yield om.valueToTree(jdks);
@@ -188,6 +190,7 @@ public class CoreRuntime {
           IpcParams.reqName(params), IpcParams.bool(params, "enabled", false));
       case "rebuildServices" -> {
         serviceManager.stopAll();
+        serviceManager.stopLeftoverProcesses();
         JsonNode result = workspaceManager.rebuildServices();
         emitEvent.accept("services", result);
         yield result;
@@ -234,6 +237,14 @@ public class CoreRuntime {
     LogFileWriter.close();
   }
 
+  private JsonNode openServicePortFile(String name) {
+    ServiceDescriptor sd = serviceManager.requireService(name);
+    Path project = Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize();
+    Path file = workspaceManager.preparePortFile(sd.getDefinition());
+    launcher.openEditor(project, file);
+    return om.getNodeFactory().objectNode().put("ok", true).put("message", "Arquivo da porta aberto");
+  }
+
   private JsonNode openServicePath(String name, String message, java.util.function.Consumer<Path> action) {
     ServiceDescriptor sd = serviceManager.requireService(name);
     action.accept(Path.of(sd.getDefinition().getPath()).toAbsolutePath().normalize());
@@ -250,7 +261,8 @@ public class CoreRuntime {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+          LogFileWriter.log("process-monitor: " + e.getMessage());
         }
       }
     }, "process-monitor");

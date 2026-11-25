@@ -1,5 +1,6 @@
 package dev.safra.orchestrator.core.runtime.discovery.java;
 
+import dev.safra.orchestrator.core.runtime.discovery.PortDeclaration;
 import dev.safra.orchestrator.core.runtime.workspace.StateStore;
 import dev.safra.orchestrator.model.ProjectType;
 import dev.safra.orchestrator.model.ServiceDefinition;
@@ -60,7 +61,10 @@ public class ProjectScanner {
             return FileVisitResult.CONTINUE;
 
           String serviceName = dir.getFileName().toString();
-          int port = portExtractor.extract(dir).orElse(18080 + (Math.abs(serviceName.hashCode()) % 120));
+          PortDeclaration located = portExtractor.locate(dir).orElse(null);
+          int port = located != null && located.port() != null
+              ? located.port()
+              : 18080 + (Math.abs(serviceName.hashCode()) % 120);
 
           ServiceDefinition def = new ServiceDefinition();
           def.setName(serviceName);
@@ -69,6 +73,7 @@ public class ProjectScanner {
           def.setContainerIds(new ArrayList<>());
           def.setProjectType(ProjectType.SPRING_BOOT);
           def.setDetectedPort(port);
+          def.setPortFile(located == null ? null : located.filePath());
 
           Map<String, String> env = new HashMap<>();
           env.put("SERVER_PORT", String.valueOf(port));

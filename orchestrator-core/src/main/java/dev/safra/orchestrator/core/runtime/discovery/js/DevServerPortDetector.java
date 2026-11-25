@@ -1,5 +1,7 @@
 package dev.safra.orchestrator.core.runtime.discovery.js;
 
+import dev.safra.orchestrator.core.runtime.discovery.ConfigText;
+import dev.safra.orchestrator.core.runtime.discovery.PortDeclaration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -37,61 +39,100 @@ public final class DevServerPortDetector {
   }
 
   public static Integer readEnvPort(Path dir, List<String> keys) {
+    PortDeclaration found = locateEnvPort(dir, keys);
+    return found == null ? null : found.port();
+  }
+
+  public static PortDeclaration locateEnvPort(Path dir, List<String> keys) {
     Path envFile = dir.resolve(".env");
+
     if (!Files.isRegularFile(envFile)) {
       return null;
     }
+
     try {
       for (String line : Files.readAllLines(envFile)) {
         String trimmed = line.trim();
+
         if (trimmed.isBlank() || trimmed.startsWith("#")) {
           continue;
         }
+
         int equals = trimmed.indexOf('=');
+
         if (equals <= 0) {
           continue;
         }
+
         String key = trimmed.substring(0, equals).trim();
+
         if (!keys.contains(key)) {
           continue;
         }
-        Integer port = parseInt(stripQuotes(trimmed.substring(equals + 1).trim()));
+
+        Integer port = parseInt(ConfigText.stripQuotes(trimmed.substring(equals + 1).trim()));
+
         if (port != null) {
-          return port;
+          return PortDeclaration.of(port, envFile);
         }
       }
     } catch (Exception ignored) {
     }
+
     return null;
   }
 
   public static Integer readViteServerPort(Path dir) {
+    PortDeclaration found = locateViteServerPort(dir);
+    return found == null ? null : found.port();
+  }
+
+  public static PortDeclaration locateViteServerPort(Path dir) {
     for (Path config : viteConfigFiles(dir)) {
       Integer port = readFirstMatch(config, VITE_PORT_PATTERN);
+
       if (port != null) {
-        return port;
+        return PortDeclaration.of(port, config);
       }
     }
+
     return null;
   }
 
   public static Integer readSiblingFrontendProxyPort(Path backendDir) {
+    PortDeclaration found = locateSiblingFrontendProxyPort(backendDir);
+    return found == null ? null : found.port();
+  }
+
+  public static PortDeclaration locateSiblingFrontendProxyPort(Path backendDir) {
     Path parent = backendDir.getParent();
+
     if (parent == null || !Files.isDirectory(parent)) {
       return null;
     }
+
     try (Stream<Path> configs = Files.walk(parent, 3)) {
-      Optional<Integer> port = configs
+      Optional<PortDeclaration> port = configs
           .filter(Files::isRegularFile)
           .filter(DevServerPortDetector::isViteConfig)
           .filter(config -> !config.startsWith(backendDir))
-          .map(config -> readFirstMatch(config, VITE_PROXY_TARGET_PATTERN))
+          .map(DevServerPortDetector::proxyTarget)
           .filter(value -> value != null)
           .findFirst();
       return port.orElse(null);
     } catch (Exception ignored) {
       return null;
     }
+  }
+
+  private static PortDeclaration proxyTarget(Path config) {
+    Integer port = readFirstMatch(config, VITE_PROXY_TARGET_PATTERN);
+
+    if (port == null) {
+      return null;
+    }
+
+    return PortDeclaration.of(port, config);
   }
 
   private static List<Path> viteConfigFiles(Path dir) {
@@ -116,14 +157,6 @@ public final class DevServerPortDetector {
     } catch (Exception ignored) {
     }
     return null;
-  }
-
-  private static String stripQuotes(String value) {
-    if (value.length() >= 2
-        && ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'")))) {
-      return value.substring(1, value.length() - 1);
-    }
-    return value;
   }
 
   private static Integer parseInt(String value) {

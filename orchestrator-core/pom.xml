@@ -6,7 +6,7 @@
 
   <groupId>dev.safra</groupId>
   <artifactId>orchestrator-core</artifactId>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <name>orchestrator-core</name>
   <description>Local dev orchestrator core (Desktop IPC)</description>
 
@@ -79,6 +79,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
         <configuration>
           <encoding>${maven.compiler.encoding}</encoding>
           <source>${java.version}</source>

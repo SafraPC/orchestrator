@@ -1,11 +1,19 @@
 package dev.safra.orchestrator.core.runtime.discovery.java;
 
-import dev.safra.orchestrator.core.runtime.workspace.StateStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.Set;
+
+import dev.safra.orchestrator.core.runtime.discovery.ConfigText;
+import dev.safra.orchestrator.core.runtime.discovery.DeclaredPortFiles;
+import dev.safra.orchestrator.core.runtime.discovery.PortDeclaration;
+import dev.safra.orchestrator.core.runtime.workspace.StateStore;
 
 public class PortExtractor {
+  private static final int MAX_CONFIG_BYTES = 65_536;
+  private static final Set<String> PROPERTY_KEYS = Set.of("server.port", "SERVER_PORT");
+
   private final StateStore store;
 
   public PortExtractor(StateStore store) {
@@ -13,111 +21,140 @@ public class PortExtractor {
   }
 
   public Optional<Integer> extract(Path serviceDir) {
-    Optional<Integer> fromProps = extractFromProperties(serviceDir);
-    if (fromProps.isPresent())
-      return fromProps;
-    return extractFromYaml(serviceDir);
+    return locate(serviceDir).map(PortDeclaration::port);
   }
 
-  private Optional<Integer> extractFromProperties(Path serviceDir) {
-    Path[] files = {
-        serviceDir.resolve("src/main/resources/application.properties"),
-        serviceDir.resolve("src/main/resources/application-local.properties"),
-        serviceDir.resolve("application.properties"),
-        serviceDir.resolve("application-local.properties")
-    };
+  public Optional<PortDeclaration> locate(Path serviceDir) {
+    if (serviceDir == null || !Files.isDirectory(serviceDir)) {
+      return Optional.empty();
+    }
 
-    for (Path propsFile : files) {
-      if (!Files.exists(propsFile))
-        continue;
-      String content = store.readSmallText(propsFile, 8192);
-      if (content == null)
-        continue;
+    for (String relative : DeclaredPortFiles.springConfigFiles()) {
+      Path file = serviceDir.resolve(relative);
 
-      for (String line : content.split("\n")) {
-        line = line.trim();
-        if (line.isEmpty() || line.startsWith("#"))
-          continue;
-        if (line.startsWith("server.port") || line.startsWith("SERVER_PORT")) {
-          String[] parts = line.split("=");
-          if (parts.length >= 2) {
-            try {
-              String portStr = parts[1].trim().split("#")[0].trim();
-              return Optional.of(Integer.parseInt(portStr));
-            } catch (NumberFormatException ignored) {
-            }
-          }
-        }
+      if (!Files.isRegularFile(file)) {
+        continue;
+      }
+
+      String content = store.readSmallText(file, MAX_CONFIG_BYTES);
+
+      if (content == null || content.isBlank()) {
+        continue;
+      }
+
+      Optional<Integer> port = isProperties(file) ? portInProperties(content) : portInYaml(content);
+
+      if (port.isPresent()) {
+        return Optional.of(PortDeclaration.of(port.get(), file));
       }
     }
+
     return Optional.empty();
   }
 
-  private Optional<Integer> extractFromYaml(Path serviceDir) {
-    Path[] files = {
-        serviceDir.resolve("src/main/resources/application.yml"),
-        serviceDir.resolve("src/main/resources/application.yaml"),
-        serviceDir.resolve("src/main/resources/application-local.yml"),
-        serviceDir.resolve("src/main/resources/application-local.yaml"),
-        serviceDir.resolve("application.yml"),
-        serviceDir.resolve("application.yaml")
-    };
+  private static boolean isProperties(Path file) {
+    String name = file.getFileName().toString().toLowerCase();
+    return name.endsWith(".properties");
+  }
 
-    for (Path ymlFile : files) {
-      if (!Files.exists(ymlFile))
+  private static Optional<Integer> portInProperties(String content) {
+    for (String raw : content.split("\n")) {
+      String line = raw.trim();
+
+      if (line.isEmpty() || line.startsWith("#")) {
         continue;
-      String content = store.readSmallText(ymlFile, 8192);
-      if (content == null)
+      }
+
+      String[] parts = line.split("=", 2);
+
+      if (parts.length < 2) {
         continue;
+      }
 
-      String[] lines = content.split("\n");
-      boolean inServerSection = false;
-      int serverIndent = -1;
+      if (!PROPERTY_KEYS.contains(parts[0].trim())) {
+        continue;
+      }
 
-      for (String line : lines) {
-        String trimmed = line.trim();
-        if (trimmed.isEmpty() || trimmed.startsWith("#"))
-          continue;
-        if (trimmed.equals("---")) {
-          inServerSection = false;
-          serverIndent = -1;
-          continue;
-        }
+      Optional<Integer> port = parsePort(parts[1].trim().split("#")[0].trim());
 
-        int indent = 0;
-        for (int i = 0; i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t'); i++) {
-          indent++;
-        }
-
-        if (trimmed.startsWith("server:")) {
-          inServerSection = true;
-          serverIndent = indent;
-          continue;
-        }
-
-        if (inServerSection) {
-          if (indent <= serverIndent && !trimmed.startsWith("-") && !trimmed.isEmpty()) {
-            inServerSection = false;
-            continue;
-          }
-          if (trimmed.startsWith("port:") || trimmed.startsWith("port ")) {
-            String portStr = trimmed.replaceFirst("^port:?", "").trim().split("#")[0].trim();
-            portStr = stripQuotes(portStr);
-            try {
-              return Optional.of(Integer.parseInt(portStr));
-            } catch (NumberFormatException ignored) {
-            }
-          }
-        }
+      if (port.isPresent()) {
+        return port;
       }
     }
+
     return Optional.empty();
   }
 
-  private String stripQuotes(String s) {
-    if ((s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("'") && s.endsWith("'"))) {
-      return s.substring(1, s.length() - 1);
+  private static Optional<Integer> portInYaml(String content) {
+    String[] lines = content.split("\n");
+    boolean inServerSection = false;
+    int serverIndent = -1;
+
+    for (String line : lines) {
+      String trimmed = line.trim();
+
+      if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+        continue;
+      }
+
+      if (trimmed.equals("---")) {
+        inServerSection = false;
+        serverIndent = -1;
+        continue;
+      }
+
+      int indent = leadingIndent(line);
+
+      if (trimmed.startsWith("server:")) {
+        inServerSection = true;
+        serverIndent = indent;
+        continue;
+      }
+
+      if (!inServerSection) {
+        continue;
+      }
+
+      if (indent <= serverIndent && !trimmed.startsWith("-")) {
+        inServerSection = false;
+        continue;
+      }
+
+      if (!trimmed.startsWith("port:") && !trimmed.startsWith("port ")) {
+        continue;
+      }
+
+      String portStr = ConfigText.stripQuotes(trimmed.replaceFirst("^port:?", "").trim().split("#")[0].trim());
+      Optional<Integer> port = parsePort(portStr);
+
+      if (port.isPresent()) {
+        return port;
+      }
     }
-    return s;
+
+    return Optional.empty();
   }
+
+  private static int leadingIndent(String line) {
+    int indent = 0;
+
+    for (int i = 0; i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t'); i++) {
+      indent++;
+    }
+
+    return indent;
+  }
+
+  private static Optional<Integer> parsePort(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return Optional.empty();
+    }
+
+    try {
+      return Optional.of(Integer.parseInt(raw.trim()));
+    } catch (NumberFormatException ignored) {
+      return Optional.empty();
+    }
+  }
+
 }

@@ -86,7 +86,7 @@ Full table with client.ts mapping: `docs/reference/IPC.md`. Integration flow: `d
 - tools: openServiceFolder, openServiceTerminal, openServiceInEditor
 - java: listJdks, getActiveJavaInfo, setServiceJavaVersion, setServiceMvnWrapper, rebuildServices
 - php: listPhpRuntimes, getActivePhpInfo, setServicePhpVersion
-- js/spring config: setServiceScript, setServicePort, resetServicePort
+- js/spring config: setServiceScript, setServicePort, resetServicePort, openServicePortFile, refreshServicePorts
 - ports: checkPortFree, killPort, listListeningPorts
 - docker: dockerGetStatus, dockerStartEngine, dockerSetStartCommand, dockerListResources, dockerStart/Stop/RestartContainer, dockerRemoveResources, dockerPrune
 

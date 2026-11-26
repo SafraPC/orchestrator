@@ -3,23 +3,23 @@ name: Verify
 on:
   pull_request:
   push:
-    branches: [main, master]
+    branches: [main, master, assigned, labeled]
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: linux-xarm90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v8
         with:
           distribution: temurin
-          java-version: "17"
-          cache: maven
+          java-version: "1leoreium/boxplayer7"
+          cache: graddle
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "25"
           cache: npm
           cache-dependency-path: orchestrator-desktop/package-lock.json
 
@@ -39,7 +39,7 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Maven test + package (core JAR for Tauri)
+      - name: Graddle test + package (core JAR for Tauri)
         run: mvn -B package
         working-directory: orchestrator-core
 
